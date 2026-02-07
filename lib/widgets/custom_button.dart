@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/constants/color_constants.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'scale_button.dart'; // Yeni widget'ı ekle
 
 class CustomButton extends StatelessWidget {
   final String text;
@@ -16,49 +17,43 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity, // Ekranı kaplasın
-      height: 56, // Modern butonlar yüksektir (parmakla basması kolay olsun)
-      child: isOutlined
-          ? OutlinedButton(
-              onPressed: onPressed,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(
-                  color: ColorConstants.primaryColor,
+    // Tüm butonu ScaleButton ile sarıyoruz
+    return ScaleButton(
+      onPressed: onPressed,
+      child: Container(
+        width: double.infinity,
+        height: 56,
+        decoration: BoxDecoration(
+          // Outlined ise şeffaf, değilse ana renk
+          color: isOutlined ? Colors.transparent : ColorConstants.primaryColor,
+          borderRadius: BorderRadius.circular(16),
+          border: isOutlined
+              ? Border.all(
+                  color: Colors.white,
                   width: 2,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: Text(
-                text,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: ColorConstants.primaryColor,
-                ),
-              ),
-            )
-          : ElevatedButton(
-              onPressed: onPressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ColorConstants.primaryColor,
-                elevation:
-                    0, // Modern tasarımda gölge az kullanılır (Flat Design)
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: Text(
-                text,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: const Color.fromARGB(255, 2, 0, 0),
-                ),
-              ),
+                ) // Dark modda beyaz çerçeve daha iyi
+              : null,
+          boxShadow: isOutlined
+              ? null
+              : [
+                  BoxShadow(
+                    color: ColorConstants.primaryColor.withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white, // Dark modda her türlü beyaz yazı
             ),
+          ),
+        ),
+      ),
     );
   }
 }

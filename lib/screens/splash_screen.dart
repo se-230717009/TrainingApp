@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.forward();
 
     // 2. Sayfa Geçişi (6 saniye bekleyip WelcomeScreen'e git)
-    Future.delayed(const Duration(seconds: 6), () {
+    Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const WelcomeScreen()),

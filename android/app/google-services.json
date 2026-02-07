@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "296598244133",
+    "project_id": "coachingapp-b57df",
+    "storage_bucket": "coachingapp-b57df.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:296598244133:android:86cfb4d04f890c85cba8cc",
+        "android_client_info": {
+          "package_name": "com.example.coachingapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDF1n-yLpPNxb1xJlhVdVJRU0gs56hg8nM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

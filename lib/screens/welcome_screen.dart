@@ -2,21 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/custom_button.dart';
+import 'role_selection_screen.dart';
+import 'login_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Ekranın boyutunu alalım
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       // Stack: Üst üste katmanlar koymamızı sağlar
       body: Stack(
         children: [
           // KATMAN 1: ARKA PLAN GÖRSELİ
-          // (İnternetten rastgele bir spor görseli çekiyoruz)
           Positioned.fill(
             child: Image.network(
               'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?q=80&w=1920&auto=format&fit=crop',
@@ -109,7 +107,12 @@ class WelcomeScreen extends StatelessWidget {
                   CustomButton(
                     text: "Giriş Yap",
                     onPressed: () {
-                      print("Giriş Yap tıklandı");
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                      );
                     },
                   ),
 
@@ -122,7 +125,12 @@ class WelcomeScreen extends StatelessWidget {
                     text: "Hesap Oluştur",
                     isOutlined: true,
                     onPressed: () {
-                      print("Kayıt Ol tıklandı");
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RoleSelectionScreen(),
+                        ),
+                      );
                     },
                   ),
                 ],

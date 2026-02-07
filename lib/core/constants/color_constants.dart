@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class ColorConstants {
   // Ana Renk: Enerjik bir Mor veya Mavi (Spotify yeşili veya Instagram gradienti gibi düşün)
-  static const Color primaryColor = Color.fromARGB(255, 14, 234, 234);
+  static const Color primaryColor = Color.fromARGB(255, 16, 225, 225);
 
   // İkincil Renk: Detaylar için (Turuncu gibi)
   static const Color secondaryColor = Color(0xFFFF6584);
