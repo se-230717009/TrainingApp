@@ -114,7 +114,13 @@ class RoleSelectionScreen extends StatelessWidget {
                           icon: Icons.sports,
                           color: Colors.blueAccent,
                           onPressed: () {
-                            print("Antrenör seçildi");
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    UserRegisterScreen(userType: 'coach'),
+                              ),
+                            );
                           },
                         ),
 
@@ -130,8 +136,9 @@ class RoleSelectionScreen extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    const UserRegisterScreen(),
+                                builder: (context) => const UserRegisterScreen(
+                                  userType: 'athlete',
+                                ),
                               ),
                             );
                           },

@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/color_constants.dart';
-import '../core/utils/validators.dart'; // Artık bunu aşağıda kullanıyoruz!
+import '../core/utils/validators.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/scale_button.dart';
 import '../widgets/social_login_button.dart';
 
 class UserRegisterScreen extends StatefulWidget {
-  const UserRegisterScreen({super.key});
+  // Bu ekranı kimin için açıyoruz? 'athlete' veya 'coach'
+  final String userType;
+
+  const UserRegisterScreen({
+    super.key,
+    required this.userType, // Zorunlu yaptık
+  });
 
   @override
   State<UserRegisterScreen> createState() => _UserRegisterScreenState();
@@ -16,7 +22,6 @@ class UserRegisterScreen extends StatefulWidget {
 
 class _UserRegisterScreenState extends State<UserRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final _nameController = TextEditingController();
   final _surnameController = TextEditingController();
   final _usernameController = TextEditingController();
@@ -27,31 +32,38 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
   bool _isLoading = false;
 
   void _register() {
-    // validate() çalıştığında aşağıdaki CustomTextField'lara verdiğimiz
-    // validator fonksiyonları tek tek tetiklenir.
     if (_formKey.currentState!.validate()) {
-      if (_passwordController.text != _confirmPasswordController.text) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Şifreler eşleşmiyor!')));
-        return;
-      }
+      // Backend'e gönderirken widget.userType bilgisini de göndereceğiz
+      print("Kayıt Tipi: ${widget.userType}");
+      print("İsim: ${_nameController.text}");
 
-      print("Validasyon Başarılı! Kayıt Başlıyor: ${_emailController.text}");
-
+      // Simülasyon
       setState(() => _isLoading = true);
       Future.delayed(const Duration(seconds: 2), () {
         setState(() => _isLoading = false);
+        // Kayıt başarılı -> Ana Sayfaya veya Onay Ekranına yönlendir
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final double spacing = screenHeight < 700 ? 10 : 16;
+
+    // Rol'e göre metinleri belirle
+    final bool isCoach = widget.userType == 'coach';
+    final String title = isCoach ? "Antrenör Hesabı" : "Sporcu Hesabı";
+    final String subtitle = isCoach
+        ? "Öğrencilerini bekleme, hemen başla."
+        : "Hemen başla, hedeflerine ulaş.";
+
     return Scaffold(
       backgroundColor: Colors.black,
+      resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
+          // Arka Plan
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -65,183 +77,171 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
           ),
 
           SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ScaleButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_ios_new,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    Text(
-                      "Sporcu Hesabı\nOluştur.",
-                      style: GoogleFonts.poppins(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      "Hemen başla, hedeflerine ulaş.",
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        color: Colors.white70,
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: CustomTextField(
-                            label: "Ad",
-                            icon: Icons.person_outline,
-                            controller: _nameController,
-                            maxLength: 30,
-                            // İsim için özel bir validatör yazmadık ama boş olamaz diyelim
-                            validator: (val) => val!.isEmpty ? 'Gerekli' : null,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: CustomTextField(
-                            label: "Soyad",
-                            icon: Icons.person_outline,
-                            controller: _surnameController,
-                            maxLength: 30,
-                            validator: (val) => val!.isEmpty ? 'Gerekli' : null,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    CustomTextField(
-                      label: "Kullanıcı Adı",
-                      icon: Icons.alternate_email,
-                      controller: _usernameController,
-                      maxLength: 20,
-                      // Kullanıcı adı validatörünü buraya bağlıyoruz
-                      validator: Validators.validateUsername,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    CustomTextField(
-                      label: "E-posta",
-                      icon: Icons.email_outlined,
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      maxLength: 100,
-                      // E-posta validatörünü buraya bağlıyoruz
-                      validator: Validators.validateEmail,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    CustomTextField(
-                      label: "Şifre",
-                      icon: Icons.lock_outline,
-                      isPassword: true,
-                      controller: _passwordController,
-                      maxLength: 64,
-                      // Şifre validatörünü buraya bağlıyoruz
-                      validator: Validators.validatePassword,
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.only(left: 10, top: 5),
-                      child: Text(
-                        "En az 8 karakter, 1 büyük harf, 1 rakam, 1 özel karakter.",
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: Colors.white38,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    CustomTextField(
-                      label: "Şifre Tekrar",
-                      icon: Icons.lock_reset,
-                      isPassword: true,
-                      controller: _confirmPasswordController,
-                      maxLength: 64,
-                      // Basit bir eşleşme kontrolü (ya da boş kontrolü)
-                      validator: (val) {
-                        if (val == null || val.isEmpty) return 'Tekrar giriniz';
-                        if (val != _passwordController.text)
-                          return 'Eşleşmiyor';
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 40),
-
-                    _isLoading
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              color: ColorConstants.primaryColor,
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Geri Dön Butonu
+                      Row(
+                        children: [
+                          ScaleButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back_ios_new,
+                                color: Colors.white,
+                                size: 18,
+                              ),
                             ),
-                          )
-                        : CustomButton(
-                            text: "Hesap Oluştur",
-                            onPressed: _register,
                           ),
+                        ],
+                      ),
 
-                    const SizedBox(height: 20),
+                      SizedBox(height: spacing),
 
-                    Row(
-                      children: [
-                        const Expanded(child: Divider(color: Colors.white24)),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            "veya",
-                            style: GoogleFonts.poppins(color: Colors.white38),
-                          ),
+                      // Dinamik Başlık
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
-                        const Expanded(child: Divider(color: Colors.white24)),
-                      ],
-                    ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: Colors.white70,
+                        ),
+                      ),
 
-                    const SizedBox(height: 20),
+                      SizedBox(height: spacing * 1.5),
 
-                    SocialLoginButton(
-                      text: "Google ile Kayıt Ol",
-                      iconPath: 'assets/icons/google_logo.png',
-                      onPressed: () {
-                        print("Google Sign Up Tıklandı");
-                      },
-                    ),
+                      // Ad - Soyad
+                      Row(
+                        children: [
+                          Expanded(
+                            child: CustomTextField(
+                              label: "Ad",
+                              icon: Icons.person_outline,
+                              controller: _nameController,
+                              validator: (val) => val!.isEmpty ? '' : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: CustomTextField(
+                              label: "Soyad",
+                              icon: Icons.person_outline,
+                              controller: _surnameController,
+                              validator: (val) => val!.isEmpty ? '' : null,
+                            ),
+                          ),
+                        ],
+                      ),
 
-                    const SizedBox(height: 40),
-                  ],
+                      SizedBox(height: spacing),
+
+                      CustomTextField(
+                        label: "Kullanıcı Adı",
+                        icon: Icons.alternate_email,
+                        controller: _usernameController,
+                        validator: Validators.validateUsername,
+                      ),
+
+                      SizedBox(height: spacing),
+
+                      CustomTextField(
+                        label: "E-posta",
+                        icon: Icons.email_outlined,
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: Validators.validateEmail,
+                      ),
+
+                      SizedBox(height: spacing),
+
+                      CustomTextField(
+                        label: "Şifre",
+                        icon: Icons.lock_outline,
+                        isPassword: true,
+                        controller: _passwordController,
+                        validator: Validators.validatePassword,
+                      ),
+
+                      SizedBox(height: spacing),
+
+                      CustomTextField(
+                        label: "Şifre Tekrar",
+                        icon: Icons.lock_reset,
+                        isPassword: true,
+                        controller: _confirmPasswordController,
+                        validator: (val) =>
+                            val != _passwordController.text ? '!' : null,
+                      ),
+
+                      SizedBox(height: spacing * 1.5),
+
+                      // Kayıt Butonu
+                      _isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: ColorConstants.primaryColor,
+                              ),
+                            )
+                          : CustomButton(
+                              text: "Kayıt Ol",
+                              onPressed: _register,
+                            ),
+
+                      SizedBox(height: spacing),
+
+                      // VEYA ÇİZGİSİ
+                      Row(
+                        children: [
+                          const Expanded(child: Divider(color: Colors.white24)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              "veya şununla devam et",
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: Colors.white38,
+                              ),
+                            ),
+                          ),
+                          const Expanded(child: Divider(color: Colors.white24)),
+                        ],
+                      ),
+
+                      SizedBox(height: spacing),
+
+                      // Google Butonu
+                      SocialLoginButton(
+                        text: "Google ile Devam Et",
+                        iconPath: 'assets/icons/google.png',
+                        onPressed: () {
+                          // Google Login de rolü bilmeli
+                          print(
+                            "Google Login Tıklandı - Rol: ${widget.userType}",
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
