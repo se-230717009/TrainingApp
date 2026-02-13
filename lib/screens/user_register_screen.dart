@@ -6,6 +6,8 @@ import '../widgets/custom_button.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/scale_button.dart';
 import '../widgets/social_login_button.dart';
+import '../services/auth_service.dart';
+import 'onboarding_screen.dart';
 
 class UserRegisterScreen extends StatefulWidget {
   // Bu ekranı kimin için açıyoruz? 'athlete' veya 'coach'
@@ -31,18 +33,62 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
 
   bool _isLoading = false;
 
-  void _register() {
-    if (_formKey.currentState!.validate()) {
-      // Backend'e gönderirken widget.userType bilgisini de göndereceğiz
-      print("Kayıt Tipi: ${widget.userType}");
-      print("İsim: ${_nameController.text}");
+  final AuthService _authService = AuthService();
 
-      // Simülasyon
-      setState(() => _isLoading = true);
-      Future.delayed(const Duration(seconds: 2), () {
-        setState(() => _isLoading = false);
-        // Kayıt başarılı -> Ana Sayfaya veya Onay Ekranına yönlendir
+  void _register() async {
+    // 1. Form geçerli mi kontrol et (Boş alan var mı?)
+    if (_formKey.currentState!.validate()) {
+      // 2. Yükleniyor animasyonunu başlat
+      setState(() {
+        _isLoading = true;
       });
+
+      // 3. AuthService ile Firebase'e git
+      final String? error = await _authService.registerUser(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        name: _nameController.text.trim(),
+        surname: _surnameController.text.trim(),
+        username: _usernameController.text.trim(),
+        userType: widget.userType, // 'athlete' olarak gelecek
+      );
+
+      // 4. İşlem bitti, yükleniyor animasyonunu durdur
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+
+      // 5. Sonucu kontrol et
+      if (error == null) {
+        // --- BAŞARILI ---
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Kayıt Başarılı! Hadi profilini oluşturalım."),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // Şimdilik ana sayfaya veya giriş ekranına atalım
+          // İleride buraya "Home" sayfasına yönlendirme gelecek.
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+          );
+        }
+      } else {
+        // --- HATA VAR ---
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(error), // Örn: "Bu e-posta zaten kullanımda"
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 

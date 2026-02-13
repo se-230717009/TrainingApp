@@ -1,33 +1,98 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/auth_service.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_textfield.dart';
 import '../widgets/scale_button.dart';
+import 'onboarding_screen.dart';
+import 'home_screen.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Controller'lar (Yazılanları yakalamak için)
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
+  State<LoginScreen> createState() => _LoginScreenState();
+}
 
+class _LoginScreenState extends State<LoginScreen> {
+  // Controller'lar
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  // Servis ve Durum
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
+
+  void _login() async {
+    // 1. Basit Kontrol
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen tüm alanları doldurun")),
+      );
+      return;
+    }
+
+    // 2. Yükleniyor Başlat
+    setState(() => _isLoading = true);
+
+    // 3. Giriş Yap
+    final message = await _authService.signIn(
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+    );
+
+    if (message == null) {
+      // --- GİRİŞ BAŞARILI ---
+      // Şimdi kullanıcının durumunu kontrol edelim
+      if (mounted) {
+        String uid = FirebaseAuth.instance.currentUser!.uid;
+        bool isOnboarded = await _authService.checkOnboardingStatus(uid);
+
+        if (mounted) {
+          // Yönlendirme Kararı
+          if (isOnboarded) {
+            // Eğer profil tamamsa -> Ana Sayfaya
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              (route) => false,
+            );
+          } else {
+            // Eğer eksikse -> Onboarding Ekranına (Kaldığı yerden devam etsin)
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+              (route) => false,
+            );
+          }
+        }
+      }
+    } else {
+      // --- HATA VAR ---
+      if (mounted) {
+        setState(() => _isLoading = false); // Animasyonu durdur
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Tam siyah premium zemin
+      backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Arka plan hafif gradyanı (Derinlik için)
+          // Arka Plan
           Positioned.fill(
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF1A1A1A), // Çok koyu gri
-                    Colors.black,
-                  ],
+                  colors: [Color(0xFF1A1A1A), Colors.black],
                 ),
               ),
             ),
@@ -42,7 +107,7 @@ class LoginScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. GERİ DÖN BUTONU
+                  // Geri Dön Butonu
                   ScaleButton(
                     onPressed: () => Navigator.pop(context),
                     child: Container(
@@ -64,7 +129,7 @@ class LoginScreen extends StatelessWidget {
 
                   const SizedBox(height: 40),
 
-                  // 2. BAŞLIK
+                  // Başlık
                   Text(
                     "Tekrar\nHoşgeldin.",
                     style: GoogleFonts.poppins(
@@ -85,33 +150,28 @@ class LoginScreen extends StatelessWidget {
 
                   const SizedBox(height: 50),
 
-                  // 3. INPUT ALANLARI
-                  // E-posta
+                  // Inputlar
                   CustomTextField(
                     label: "E-posta Adresi",
                     icon: Icons.email_outlined,
-                    controller: emailController,
+                    controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    maxLength: 100, // STANDART SINIR
                   ),
 
                   const SizedBox(height: 20),
 
-                  // Şifre
                   CustomTextField(
                     label: "Şifre",
                     icon: Icons.lock_outline,
                     isPassword: true,
-                    controller: passwordController,
-                    maxLength: 64, // GÜVENLİK SINIRI (Buffer overflow önlemi)
+                    controller: _passwordController,
                   ),
 
-                  // Şifremi Unuttum
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        print("Şifremi unuttum");
+                        /* Şifremi unuttum */
                       },
                       child: Text(
                         "Şifremi Unuttum?",
@@ -126,15 +186,12 @@ class LoginScreen extends StatelessWidget {
 
                   const Spacer(),
 
-                  // 4. GİRİŞ YAP BUTONU
-                  CustomButton(
-                    text: "Giriş Yap",
-                    onPressed: () {
-                      print("Email: ${emailController.text}");
-                      print("Şifre: ${passwordController.text}");
-                      // İleride buraya Firebase Auth kodu gelecek
-                    },
-                  ),
+                  // Giriş Butonu (Loading Kontrollü)
+                  _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        )
+                      : CustomButton(text: "Giriş Yap", onPressed: _login),
 
                   const SizedBox(height: 20),
                 ],
