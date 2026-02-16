@@ -7,6 +7,7 @@ import '../widgets/custom_textfield.dart';
 import '../widgets/scale_button.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
+import '../widgets/social_login_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -72,6 +73,46 @@ class _LoginScreenState extends State<LoginScreen> {
       // --- HATA VAR ---
       if (mounted) {
         setState(() => _isLoading = false); // Animasyonu durdur
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // --- GOOGLE İLE GİRİŞ FONKSİYONU ---
+  void _loginWithGoogle() async {
+    setState(() => _isLoading = true);
+
+    // DİKKAT: Login ekranında olduğumuz için role: null gönderiyoruz.
+    final message = await _authService.signInWithGoogle();
+
+    if (message == null) {
+      // Giriş Başarılı, Onboarding kontrolü yap
+      if (mounted) {
+        String uid = FirebaseAuth.instance.currentUser!.uid;
+        bool isOnboarded = await _authService.checkOnboardingStatus(uid);
+
+        if (mounted) {
+          if (isOnboarded) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+              (route) => false,
+            );
+          }
+        }
+      }
+    } else {
+      // Hata veya Uyarı Var
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message), backgroundColor: Colors.red),
         );
@@ -194,6 +235,32 @@ class _LoginScreenState extends State<LoginScreen> {
                       : CustomButton(text: "Giriş Yap", onPressed: _login),
 
                   const SizedBox(height: 20),
+
+                  Row(
+                    children: [
+                      const Expanded(child: Divider(color: Colors.white24)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          "veya şununla devam et",
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.white38,
+                          ),
+                        ),
+                      ),
+                      const Expanded(child: Divider(color: Colors.white24)),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // GOOGLE BUTONU (Yeni eklendi, dosyada import ettiğinden emin ol)
+                  SocialLoginButton(
+                    text: "Google ile Giriş Yap",
+                    iconPath: 'assets/icons/google.png',
+                    onPressed: _loginWithGoogle,
+                  ),
                 ],
               ),
             ),

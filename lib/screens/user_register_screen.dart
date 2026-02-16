@@ -92,6 +92,27 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
     }
   }
 
+  void _registerWithGoogle() async {
+    setState(() => _isLoading = true);
+
+    // DİKKAT: Kayıt ekranında olduğumuz için rolü biliyoruz ve yolluyoruz!
+    final message = await _authService.signInWithGoogle(role: widget.userType);
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (message == null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
@@ -277,12 +298,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
                       SocialLoginButton(
                         text: "Google ile Devam Et",
                         iconPath: 'assets/icons/google.png',
-                        onPressed: () {
-                          // Google Login de rolü bilmeli
-                          print(
-                            "Google Login Tıklandı - Rol: ${widget.userType}",
-                          );
-                        },
+                        onPressed: _registerWithGoogle,
                       ),
 
                       const SizedBox(height: 20),
