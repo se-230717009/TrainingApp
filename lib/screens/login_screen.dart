@@ -7,6 +7,8 @@ import '../widgets/custom_textfield.dart';
 import '../widgets/scale_button.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
+import 'coach_onboarding_screen.dart';
+import 'coach_home_screen.dart';
 import '../widgets/social_login_button.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -49,21 +51,29 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         String uid = FirebaseAuth.instance.currentUser!.uid;
         bool isOnboarded = await _authService.checkOnboardingStatus(uid);
+        String? userType = await _authService.getUserType(uid);
 
         if (mounted) {
-          // Yönlendirme Kararı
+          // Yönlendirme Kararı: Rol bazlı
+          final bool isCoach = userType == 'coach';
+
           if (isOnboarded) {
-            // Eğer profil tamamsa -> Ana Sayfaya
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
+              MaterialPageRoute(
+                builder: (context) =>
+                    isCoach ? const CoachHomeScreen() : const HomeScreen(),
+              ),
               (route) => false,
             );
           } else {
-            // Eğer eksikse -> Onboarding Ekranına (Kaldığı yerden devam etsin)
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+              MaterialPageRoute(
+                builder: (context) => isCoach
+                    ? const CoachOnboardingScreen()
+                    : const OnboardingScreen(),
+              ),
               (route) => false,
             );
           }
@@ -92,18 +102,28 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) {
         String uid = FirebaseAuth.instance.currentUser!.uid;
         bool isOnboarded = await _authService.checkOnboardingStatus(uid);
+        String? userType = await _authService.getUserType(uid);
 
         if (mounted) {
+          final bool isCoach = userType == 'coach';
+
           if (isOnboarded) {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              MaterialPageRoute(
+                builder: (_) =>
+                    isCoach ? const CoachHomeScreen() : const HomeScreen(),
+              ),
               (route) => false,
             );
           } else {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+              MaterialPageRoute(
+                builder: (_) => isCoach
+                    ? const CoachOnboardingScreen()
+                    : const OnboardingScreen(),
+              ),
               (route) => false,
             );
           }

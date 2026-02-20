@@ -8,6 +8,7 @@ import '../widgets/scale_button.dart';
 import '../widgets/social_login_button.dart';
 import '../services/auth_service.dart';
 import 'onboarding_screen.dart';
+import 'coach_onboarding_screen.dart';
 
 class UserRegisterScreen extends StatefulWidget {
   // Bu ekranı kimin için açıyoruz? 'athlete' veya 'coach'
@@ -71,11 +72,14 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
             ),
           );
 
-          // Şimdilik ana sayfaya veya giriş ekranına atalım
-          // İleride buraya "Home" sayfasına yönlendirme gelecek.
+          // Rol bazlı onboarding yönlendirmesi
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+            MaterialPageRoute(
+              builder: (context) => widget.userType == 'coach'
+                  ? const CoachOnboardingScreen()
+                  : const OnboardingScreen(),
+            ),
           );
         }
       } else {
@@ -103,7 +107,11 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
       if (message == null) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+          MaterialPageRoute(
+            builder: (_) => widget.userType == 'coach'
+                ? const CoachOnboardingScreen()
+                : const OnboardingScreen(),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

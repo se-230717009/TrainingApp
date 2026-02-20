@@ -170,6 +170,23 @@ class AuthService {
     }
   }
 
+  // --- KULLANICI ROLÜNÜ GETİR (COACH / ATHLETE) ---
+  Future<String?> getUserType(String uid) async {
+    try {
+      DocumentSnapshot doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['userType'] as String?;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // --- KULLANICI PROFİLİNİ GÜNCELLE (ONBOARDING İÇİN) ---
   Future<void> updateUserProfile({
     required String uid,
