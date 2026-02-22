@@ -10,6 +10,7 @@ import 'home_screen.dart';
 import 'coach_onboarding_screen.dart';
 import 'coach_home_screen.dart';
 import '../widgets/social_login_button.dart';
+import 'welcome_screen.dart'; // Dosya adın farklıysa burayı kendi dosyana göre düzenle
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -169,8 +170,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Geri Dön Butonu
+                  // Geri Dön Butonu
                   ScaleButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      // Geçmişi temizle ve Karşılama Ekranına zorla yönlendir
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const WelcomeScreen(), // Kendi ekranının adını buraya yaz
+                        ),
+                        (route) => false,
+                      );
+                    },
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(

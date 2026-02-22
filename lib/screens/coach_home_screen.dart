@@ -6,6 +6,7 @@ import '../core/constants/color_constants.dart';
 import '../services/auth_service.dart';
 import '../widgets/scale_button.dart';
 import 'login_screen.dart';
+import 'edit_profile_screen.dart';
 
 class CoachHomeScreen extends StatefulWidget {
   const CoachHomeScreen({super.key});
@@ -67,7 +68,14 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildMenuItem(Icons.person_outline, "Profil Düzenle", () {}),
+                _buildMenuItem(Icons.person_outline, "Profil Düzenle", () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EditProfileScreen(),
+                    ),
+                  );
+                }),
                 _buildMenuItem(
                   Icons.settings_outlined,
                   "Uygulama Ayarları",
