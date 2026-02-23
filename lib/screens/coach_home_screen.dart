@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../widgets/scale_button.dart';
 import 'login_screen.dart';
 import 'edit_profile_screen.dart';
+import 'coach_calender_screen.dart';
 
 class CoachHomeScreen extends StatefulWidget {
   const CoachHomeScreen({super.key});
@@ -18,9 +19,6 @@ class CoachHomeScreen extends StatefulWidget {
 class _CoachHomeScreenState extends State<CoachHomeScreen> {
   final AuthService _authService = AuthService();
   final String _uid = FirebaseAuth.instance.currentUser!.uid;
-
-  // Şimdilik boş ders listesi
-  final List<dynamic> _lessons = [];
 
   // --- ÇIKIŞ YAP ---
   void _signOut() async {
@@ -49,7 +47,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Tutamaç Çizgisi
                 Container(
                   width: 40,
                   height: 4,
@@ -111,26 +108,88 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
         backgroundColor: Colors.black,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            Text(
-              "Panelim",
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+        centerTitle: false,
+        titleSpacing: 24,
+        title: PopupMenuButton<String>(
+          color: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          offset: const Offset(0, 45),
+          onSelected: (value) {
+            if (value == 'takvimim') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CoachCalendarScreen(),
+                ),
+              );
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'panelim',
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.dashboard_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    "Panelim",
+                    style: GoogleFonts.poppins(color: Colors.white),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: ColorConstants.primaryColor,
-                shape: BoxShape.circle,
+            PopupMenuItem(
+              value: 'takvimim',
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_month_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    "Takvimim",
+                    style: GoogleFonts.poppins(color: Colors.white),
+                  ),
+                ],
               ),
             ),
           ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Panelim",
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Colors.white54,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: ColorConstants.primaryColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           Padding(
@@ -151,14 +210,13 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
         ],
       ),
 
-      // --- GÖVDE: StreamBuilder ile isVerified dinleme ---
+      // --- GÖVDE ---
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
             .doc(_uid)
             .snapshots(),
         builder: (context, snapshot) {
-          // Yükleniyor durumu
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(
@@ -167,7 +225,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             );
           }
 
-          // Hata durumu
           if (snapshot.hasError ||
               !snapshot.hasData ||
               !snapshot.data!.exists) {
@@ -175,8 +232,12 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
-          final bool isVerified = data['isVerified'] ?? false;
+
+          // isApproved veya isVerified alanlarından birini kontrol et
+          final bool isVerified =
+              data['isApproved'] ?? data['isVerified'] ?? false;
           final String userName = data['name'] ?? 'Antrenör';
+          final String? lessonSport = data['lessonSport'];
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,40 +255,38 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
               ),
               const SizedBox(height: 16),
 
-              // DURUM A: Henüz onaylanmamış
+              // Henüz onaylanmamışsa Banner'ı göster
               if (!isVerified) _buildVerificationBanner(),
 
-              // ANA İÇERİK
+              // ANA İÇERİK: Ders varsa vitrini göster, yoksa boş durumu göster
               Expanded(
-                child: _lessons.isEmpty
+                child: lessonSport == null
                     ? _buildEmptyState(isVerified)
-                    : _buildLessonList(),
+                    : SingleChildScrollView(child: _buildProfilePreview(data)),
               ),
             ],
           );
         },
       ),
 
-      // --- FAB: Sadece Verified ise aktif ---
+      // --- FAB: Sadece Onaylıysa Aktif ---
       floatingActionButton: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
             .doc(_uid)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData || !snapshot.data!.exists) {
+          if (!snapshot.hasData || !snapshot.data!.exists)
             return const SizedBox.shrink();
-          }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
-          final bool isVerified = data['isVerified'] ?? false;
+          final bool isVerified =
+              data['isApproved'] ?? data['isVerified'] ?? false;
 
           if (!isVerified) return const SizedBox.shrink();
 
           return ScaleButton(
             onPressed: () {
-              // Şimdilik test
-              debugPrint("✅ Yeni Ders Ekle butonuna basıldı!");
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
@@ -277,10 +336,198 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 
+  // --- KULLANICI GÖZÜNDEN PROFİL VİTRİNİ ---
+  Widget _buildProfilePreview(Map<String, dynamic> data) {
+    final String name = data['name'] ?? '';
+    final String surname = data['surname'] ?? '';
+    final String fullName = "$name $surname".trim().isEmpty
+        ? "İsimsiz Antrenör"
+        : "$name $surname";
+    final String? profileImageUrl = data['profileImageUrl'];
+    final String bio = data['bio'] ?? 'Henüz biyografi eklenmemiş.';
+
+    final String lessonSport = data['lessonSport'] ?? 'Belirtilmemiş';
+    final List<dynamic> days = data['availableDays'] ?? [];
+    final List<dynamic> hours = data['availableHours'] ?? [];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.visibility_outlined,
+                color: Colors.white54,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "Kullanıcı Gözünden Profilin",
+                style: GoogleFonts.poppins(
+                  color: Colors.white54,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Profil Üst Kısım (Fotoğraf ve İsim)
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.white10,
+                      backgroundImage: profileImageUrl != null
+                          ? NetworkImage(profileImageUrl)
+                          : null,
+                      child: profileImageUrl == null
+                          ? const Icon(
+                              Icons.person,
+                              color: Colors.white38,
+                              size: 30,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fullName,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            "Eğitmen",
+                            style: GoogleFonts.poppins(
+                              color: ColorConstants.primaryColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Biyografi
+                Text(
+                  bio,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Divider(color: Colors.white10),
+                const SizedBox(height: 16),
+
+                // Ders Bilgileri
+                Text(
+                  "Aktif Dersin",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Branş Chip'i
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ColorConstants.primaryColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    lessonSport,
+                    style: GoogleFonts.poppins(
+                      color: ColorConstants.primaryColor,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Günler ve Saatler
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.calendar_today_rounded,
+                      color: Colors.white54,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        days.isEmpty ? "Gün belirtilmedi" : days.join(', '),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.access_time_rounded,
+                      color: Colors.white54,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        hours.isEmpty ? "Saat belirtilmedi" : hours.join(', '),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- ONAY BEKLENİYOR BANNER ---
   Widget _buildVerificationBanner() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -298,7 +545,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // İkon
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -312,7 +558,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
               ),
             ),
             const SizedBox(width: 16),
-            // Metin
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -327,7 +572,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "Güvenli bir topluluk oluşturmak için referanslarınızı inceliyoruz. Onaylandıktan sonra ders ve paket eklemeye başlayabilirsiniz.",
+                    "Güvenli bir topluluk oluşturmak için referanslarınızı inceliyoruz. Hesabınız onaylandıktan sonra profiliniz ve dersiniz sporculara görünür olacaktır.",
                     style: GoogleFonts.poppins(
                       color: Colors.white54,
                       fontSize: 12,
@@ -377,7 +622,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             Text(
               isVerified
                   ? "İlk dersinizi ekleyin ve öğrencilerle buluşmaya başlayın! Sağ alttaki butona dokunarak başlayabilirsiniz."
-                  : "Profiliniz onaylandıktan sonra burada ders ve paketlerinizi yönetebileceksiniz. Bu süreç genellikle 24-48 saat sürer.",
+                  : "Profiliniz onaylandıktan sonra burada ders ve paketlerinizi yönetebileceksiniz.",
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 color: Colors.white54,
@@ -422,17 +667,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  // --- DERS LİSTESİ (İLERİDE KULLANILACAK) ---
-  Widget _buildLessonList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(24),
-      itemCount: _lessons.length,
-      itemBuilder: (context, index) {
-        return const ListTile(title: Text("Ders"));
-      },
     );
   }
 

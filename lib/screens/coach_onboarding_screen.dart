@@ -23,14 +23,18 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   int _currentIndex = 0;
   bool _isLoading = false;
 
-  // --- VERİLER ---
+  // --- MEVCUT VERİLER ---
   List<String> _selectedSpecialties = [];
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
-
-  // YENİ: Dosya Yükleme Değişkenleri
+  final TextEditingController _priceController = TextEditingController();
   File? _selectedFile;
   String? _fileName;
+
+  // --- YENİ EKLENEN VERİLER (DERS VE MÜSAİTLİK) ---
+  String? _selectedLessonSport;
+  List<String> _selectedDays = [];
+  List<String> _selectedHours = [];
 
   final List<String> _specialties = [
     "Fitness",
@@ -43,26 +47,36 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     "Tenis",
     "Futbol",
     "Basketbol",
-    "Beslenme",
-    "Rehabilitasyon",
   ];
 
-  // --- DOSYA SEÇME FONKSİYONU ---
+  final List<String> _daysList = [
+    "Pazartesi",
+    "Salı",
+    "Çarşamba",
+    "Perşembe",
+    "Cuma",
+    "Cumartesi",
+    "Pazar",
+  ];
+
+  final List<String> _hoursList = [
+    "06:00 - 09:00",
+    "09:00 - 12:00",
+    "12:00 - 15:00",
+    "15:00 - 18:00",
+    "18:00 - 21:00",
+    "21:00 - 00:00",
+  ];
+
   Future<void> _pickFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: [
-          'jpg',
-          'jpeg',
-          'png',
-          'pdf',
-        ], // İzin verilen formatlar
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
       );
 
       if (result != null) {
         setState(() {
-          // Dosyayı alıyoruz
           _selectedFile = File(result.files.single.path!);
           _fileName = result.files.single.name;
         });
@@ -72,39 +86,34 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     }
   }
 
-  // --- VALIDATION VE İLERLEME MANTIĞI ---
   void _nextPage() {
-    // 1. UZMANLIK ALANI KONTROLÜ
-    if (_currentIndex == 0) {
-      if (_selectedSpecialties.isEmpty) {
-        _showError("Lütfen en az bir uzmanlık alanı seçin.");
-        return;
-      }
+    if (_currentIndex == 0 && _selectedSpecialties.isEmpty) {
+      _showError("Lütfen en az bir uzmanlık alanı seçin.");
+      return;
+    }
+    if (_currentIndex == 1 &&
+        (_bioController.text.trim().isEmpty ||
+            _bioController.text.trim().length < 20)) {
+      _showError("Bio en az 20 karakter olmalıdır.");
+      return;
+    }
+    if (_currentIndex == 2 &&
+        _referenceController.text.trim().isEmpty &&
+        _selectedFile == null) {
+      _showError("Lütfen bir referans linki girin veya belge yükleyin.");
+      return;
+    }
+    if (_currentIndex == 3 && _selectedLessonSport == null) {
+      _showError("Lütfen oluşturacağınız ders için bir branş seçin.");
+      return;
+    }
+    if (_currentIndex == 4 &&
+        (_selectedDays.isEmpty || _selectedHours.isEmpty)) {
+      _showError("Lütfen en az bir gün ve saat aralığı seçin.");
+      return;
     }
 
-    // 2. BIO KONTROLÜ
-    if (_currentIndex == 1) {
-      if (_bioController.text.trim().isEmpty) {
-        _showError("Lütfen kendinizi kısaca tanıtın.");
-        return;
-      }
-      if (_bioController.text.trim().length < 20) {
-        _showError("Bio en az 20 karakter olmalıdır.");
-        return;
-      }
-    }
-
-    // 3. REFERANS VE DOSYA KONTROLÜ (BURAYI KİLİTLEDİK)
-    if (_currentIndex == 2) {
-      // Eğer ne link yazmış, ne de dosya seçmişse GEÇİŞE İZİN VERME
-      if (_referenceController.text.trim().isEmpty && _selectedFile == null) {
-        _showError("Lütfen bir referans linki girin VEYA bir belge yükleyin.");
-        return;
-      }
-    }
-
-    // İLERLE VEYA BİTİR
-    if (_currentIndex < 2) {
+    if (_currentIndex < 4) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
@@ -119,19 +128,16 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
       SnackBar(
         content: Text(message, style: GoogleFonts.poppins()),
         backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  // --- KAYDET VE BİTİR ---
   void _finishOnboarding() async {
     setState(() => _isLoading = true);
 
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
 
-      // Yazılı linkleri al (varsa)
       List<String> referenceLinks = _referenceController.text
           .trim()
           .split(',')
@@ -139,33 +145,28 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
           .where((e) => e.isNotEmpty)
           .toList();
 
-      // EĞER DOSYA SEÇİLMİŞSE FIREBASE STORAGE'A YÜKLE
       if (_selectedFile != null) {
-        // Firebase Storage'da klasör yolu oluştur: verifications/uid/dosya_adi
         final storageRef = FirebaseStorage.instance
             .ref()
             .child('verifications')
             .child(uid)
             .child(_fileName!);
-
-        // Dosyayı yükle
         await storageRef.putFile(_selectedFile!);
-
-        // Yüklenen dosyanın indirme linkini al
         final String fileUrl = await storageRef.getDownloadURL();
-
-        // Linki listeye ekle
         referenceLinks.add(fileUrl);
       }
 
-      // Veritabanını güncelle
       await _authService.updateUserProfile(
         uid: uid,
         data: {
           'specialties': _selectedSpecialties,
           'bio': _bioController.text.trim(),
-          'referenceLinks':
-              referenceLinks, // Hem yazılı linkler hem dosya linki burada
+          'referenceLinks': referenceLinks,
+          'lessonSport': _selectedLessonSport,
+          'hourlyRate': int.tryParse(_priceController.text) ?? 0,
+          'availableDays': _selectedDays,
+          'availableHours': _selectedHours,
+          'isApproved': false, // Admin onayına kadar false kalacak
           'isOnboardingCompleted': true,
         },
       );
@@ -185,22 +186,13 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   }
 
   @override
-  void dispose() {
-    _bioController.dispose();
-    _referenceController.dispose();
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final double progressValue = (_currentIndex + 1) / 3;
+    final double progressValue = (_currentIndex + 1) / 5;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Arka Plan
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -215,11 +207,9 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
               ),
             ),
           ),
-
           SafeArea(
             child: Column(
               children: [
-                // İlerleme Çubuğu
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -240,7 +230,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                       ),
                       const SizedBox(width: 15),
                       Text(
-                        "${_currentIndex + 1}/3",
+                        "${_currentIndex + 1}/5",
                         style: GoogleFonts.poppins(
                           color: Colors.white54,
                           fontWeight: FontWeight.bold,
@@ -249,8 +239,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                     ],
                   ),
                 ),
-
-                // Sayfalar
                 Expanded(
                   child: PageView(
                     controller: _pageController,
@@ -261,11 +249,11 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                       _buildStep1Specialties(),
                       _buildStep2Bio(),
                       _buildStep3References(),
+                      _buildStep4LessonSport(),
+                      _buildStep5Availability(),
                     ],
                   ),
                 ),
-
-                // Buton
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                   child: _isLoading
@@ -273,7 +261,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                           color: ColorConstants.primaryColor,
                         )
                       : CustomButton(
-                          text: _currentIndex == 2 ? "Tamamla" : "Devam Et",
+                          text: _currentIndex == 4 ? "Tamamla" : "Devam Et",
                           onPressed: _nextPage,
                         ),
                 ),
@@ -284,8 +272,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
       ),
     );
   }
-
-  // --- WIDGETS ---
 
   Widget _buildStep1Specialties() {
     return _buildStepContainer(
@@ -302,24 +288,16 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
               labelStyle: GoogleFonts.poppins(
                 color: isSelected
                     ? Colors.black
-                    : const Color.fromARGB(179, 1, 1, 1),
-                fontWeight: FontWeight.w600,
+                    : const Color.fromARGB(179, 0, 0, 0),
               ),
               selected: isSelected,
               selectedColor: ColorConstants.primaryColor,
               backgroundColor: Colors.white10,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(100),
+              onSelected: (selected) => setState(
+                () => selected
+                    ? _selectedSpecialties.add(specialty)
+                    : _selectedSpecialties.remove(specialty),
               ),
-              side: BorderSide.none,
-              onSelected: (selected) {
-                setState(() {
-                  selected
-                      ? _selectedSpecialties.add(specialty)
-                      : _selectedSpecialties.remove(specialty);
-                });
-              },
             );
           }).toList(),
         ),
@@ -331,33 +309,135 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     return _buildStepContainer(
       title: "Kendini Tanıt",
       subtitle: "Sporcuların seni daha iyi tanıması için kısa bir bio yaz.",
+      child: TextField(
+        controller: _bioController,
+        maxLines: 6,
+        maxLength: 300,
+        style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+        decoration: InputDecoration(
+          hintText: "Örn: 5 yıllık fitness deneyimim ile...",
+          hintStyle: GoogleFonts.poppins(color: Colors.white30, fontSize: 14),
+          filled: true,
+          fillColor: Colors.white10,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep3References() {
+    return _buildStepContainer(
+      title: "Referansların",
+      subtitle: "Sosyal medya linki veya sertifika yükleyebilirsin.",
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _referenceController,
+            style: GoogleFonts.poppins(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: "https://instagram.com/kullaniciadi",
+              filled: true,
+              fillColor: Colors.white10,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            "VEYA Belge Yükle",
+            style: GoogleFonts.poppins(color: Colors.white70),
+          ),
+          const SizedBox(height: 10),
+          ScaleButton(
+            onPressed: _pickFile,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _selectedFile != null
+                      ? ColorConstants.primaryColor
+                      : Colors.white24,
+                ),
+              ),
+              child: Text(
+                _selectedFile != null ? _fileName! : "Sertifika Seç",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  color: _selectedFile != null
+                      ? ColorConstants.primaryColor
+                      : Colors.white70,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep4LessonSport() {
+    return _buildStepContainer(
+      title: "Ders & Ücret",
+      subtitle: "İlk dersini oluştur, kursiyerlerini hemen bul!",
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.circular(16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _specialties.map((sport) {
+                final isSelected = _selectedLessonSport == sport;
+                return ChoiceChip(
+                  label: Text(sport),
+                  labelStyle: GoogleFonts.poppins(
+                    color: isSelected
+                        ? Colors.black
+                        : const Color.fromARGB(179, 0, 0, 0),
+                  ),
+                  selected: isSelected,
+                  selectedColor: ColorConstants.primaryColor,
+                  backgroundColor: Colors.white10,
+                  onSelected: (selected) => setState(
+                    () => _selectedLessonSport = selected ? sport : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 30),
+            Text(
+              "Saatlik Ücret (TL)",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
-              child: TextField(
-                controller: _bioController,
-                maxLines: 6,
-                maxLength: 300,
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText:
-                      "Örn: 5 yıllık fitness deneyimim ile yüzlerce sporcuya destek oldum...",
-                  hintStyle: GoogleFonts.poppins(
-                    color: Colors.white30,
-                    fontSize: 14,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.all(20),
-                  counterStyle: GoogleFonts.poppins(
-                    color: Colors.white38,
-                    fontSize: 12,
-                  ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _priceController,
+              keyboardType: TextInputType.number,
+              style: GoogleFonts.poppins(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: "Örn: 500",
+                hintStyle: GoogleFonts.poppins(color: Colors.white30),
+                filled: true,
+                fillColor: Colors.white10,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: const Icon(
+                  Icons.attach_money_rounded,
+                  color: Colors.white54,
                 ),
               ),
             ),
@@ -367,122 +447,66 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  Widget _buildStep3References() {
+  Widget _buildStep5Availability() {
     return _buildStepContainer(
-      title: "Referansların",
-      subtitle:
-          "Hesabını onaylamamız için Instagram linkini yazabilir VEYA sertifikanı yükleyebilirsin.",
+      title: "Müsaitlik Durumu",
+      subtitle: "Hangi gün ve saatlerde ders verebilirsin?",
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. SEÇENEK: Link Yazma
             Text(
-              "Seçenek 1: Sosyal Medya / Web Linki",
+              "Günler",
               style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 10),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: TextField(
-                controller: _referenceController,
-                style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: "Örn: https://instagram.com/kullaniciadi",
-                  hintStyle: GoogleFonts.poppins(
-                    color: Colors.white30,
-                    fontSize: 14,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _daysList.map((day) {
+                final isSelected = _selectedDays.contains(day);
+                return ChoiceChip(
+                  label: Text(day),
+                  selected: isSelected,
+                  selectedColor: ColorConstants.primaryColor,
+                  backgroundColor: Colors.white10,
+                  onSelected: (val) => setState(
+                    () => val
+                        ? _selectedDays.add(day)
+                        : _selectedDays.remove(day),
                   ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
-                  prefixIcon: const Icon(
-                    Icons.link_rounded,
-                    color: Colors.white38,
-                    size: 22,
-                  ),
-                ),
-              ),
+                );
+              }).toList(),
             ),
-
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Row(
-                children: [
-                  Expanded(child: Divider(color: Colors.white24)),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      "VEYA",
-                      style: TextStyle(color: Colors.white54),
-                    ),
-                  ),
-                  Expanded(child: Divider(color: Colors.white24)),
-                ],
-              ),
-            ),
-
-            // 2. SEÇENEK: Dosya Yükleme
+            const SizedBox(height: 24),
             Text(
-              "Seçenek 2: Belge Yükle (PDF, JPG, PNG)",
+              "Saat Aralıkları",
               style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 10),
-            ScaleButton(
-              onPressed: _pickFile,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  border: Border.all(
-                    color: _selectedFile != null
-                        ? ColorConstants.primaryColor
-                        : Colors.white24,
-                    style: BorderStyle.solid,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _hoursList.map((hour) {
+                final isSelected = _selectedHours.contains(hour);
+                return ChoiceChip(
+                  label: Text(hour),
+                  selected: isSelected,
+                  selectedColor: ColorConstants.primaryColor,
+                  backgroundColor: Colors.white10,
+                  onSelected: (val) => setState(
+                    () => val
+                        ? _selectedHours.add(hour)
+                        : _selectedHours.remove(hour),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      _selectedFile != null
-                          ? Icons.check_circle_outline
-                          : Icons.cloud_upload_outlined,
-                      color: _selectedFile != null
-                          ? ColorConstants.primaryColor
-                          : Colors.white54,
-                      size: 32,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _selectedFile != null
-                          ? _fileName!
-                          : "Sertifika veya Kimlik Yükle",
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.poppins(
-                        color: _selectedFile != null
-                            ? ColorConstants.primaryColor
-                            : Colors.white70,
-                        fontWeight: _selectedFile != null
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                );
+              }).toList(),
             ),
           ],
         ),
@@ -506,7 +530,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
               fontSize: 32,
               fontWeight: FontWeight.bold,
               color: Colors.white,
-              height: 1.1,
             ),
           ),
           const SizedBox(height: 8),
