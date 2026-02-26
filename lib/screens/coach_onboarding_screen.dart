@@ -23,18 +23,18 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   int _currentIndex = 0;
   bool _isLoading = false;
 
-  // --- MEVCUT VERİLER ---
   List<String> _selectedSpecialties = [];
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController();
   File? _selectedFile;
   String? _fileName;
 
-  // --- YENİ EKLENEN VERİLER (DERS VE MÜSAİTLİK) ---
   String? _selectedLessonSport;
+  final TextEditingController _priceController = TextEditingController();
   List<String> _selectedDays = [];
   List<String> _selectedHours = [];
+  String? _coachCharacter;
+  String? _deliveryMode;
 
   final List<String> _specialties = [
     "Fitness",
@@ -48,7 +48,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     "Futbol",
     "Basketbol",
   ];
-
   final List<String> _daysList = [
     "Pazartesi",
     "Salı",
@@ -58,7 +57,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     "Cumartesi",
     "Pazar",
   ];
-
   final List<String> _hoursList = [
     "06:00 - 09:00",
     "09:00 - 12:00",
@@ -68,52 +66,52 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     "21:00 - 00:00",
   ];
 
+  // ÖĞRENCİ HEDEFLERİYLE EŞLEŞECEK 5 KARAKTER
+  final List<String> _characterList = [
+    "Motivatör & Enerjik",
+    "Disiplinli & Güç Odaklı",
+    "Dinamik & Dayanıklılık Odaklı",
+    "Sakin & Beden Farkındalığı",
+    "Sert & Hedef Odaklı (Pro)",
+  ];
+
   Future<void> _pickFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
       );
-
-      if (result != null) {
+      if (result != null)
         setState(() {
           _selectedFile = File(result.files.single.path!);
           _fileName = result.files.single.name;
         });
-      }
     } catch (e) {
       _showError("Dosya seçilirken bir hata oluştu: $e");
     }
   }
 
   void _nextPage() {
-    if (_currentIndex == 0 && _selectedSpecialties.isEmpty) {
-      _showError("Lütfen en az bir uzmanlık alanı seçin.");
-      return;
-    }
+    if (_currentIndex == 0 && _selectedSpecialties.isEmpty)
+      return _showError("Lütfen en az bir uzmanlık alanı seçin.");
     if (_currentIndex == 1 &&
         (_bioController.text.trim().isEmpty ||
-            _bioController.text.trim().length < 20)) {
-      _showError("Bio en az 20 karakter olmalıdır.");
-      return;
-    }
+            _bioController.text.trim().length < 20))
+      return _showError("Bio en az 20 karakter olmalıdır.");
     if (_currentIndex == 2 &&
         _referenceController.text.trim().isEmpty &&
-        _selectedFile == null) {
-      _showError("Lütfen bir referans linki girin veya belge yükleyin.");
-      return;
-    }
-    if (_currentIndex == 3 && _selectedLessonSport == null) {
-      _showError("Lütfen oluşturacağınız ders için bir branş seçin.");
-      return;
-    }
-    if (_currentIndex == 4 &&
-        (_selectedDays.isEmpty || _selectedHours.isEmpty)) {
-      _showError("Lütfen en az bir gün ve saat aralığı seçin.");
-      return;
-    }
+        _selectedFile == null)
+      return _showError("Lütfen bir referans linki girin veya belge yükleyin.");
+    if (_currentIndex == 3 &&
+        (_selectedLessonSport == null || _priceController.text.isEmpty))
+      return _showError("Lütfen branş,ders şekli ve ücret belirleyin.");
+    if (_currentIndex == 4 && (_selectedDays.isEmpty || _selectedHours.isEmpty))
+      return _showError("Lütfen en az bir gün ve saat aralığı seçin.");
+    if (_currentIndex == 5 && _coachCharacter == null)
+      return _showError("Lütfen eğitmen karakterinizi seçin.");
 
-    if (_currentIndex < 4) {
+    if (_currentIndex < 5) {
+      // 6 Adım oldu (0-5)
       _pageController.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
@@ -134,10 +132,8 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
 
   void _finishOnboarding() async {
     setState(() => _isLoading = true);
-
     try {
       final uid = FirebaseAuth.instance.currentUser!.uid;
-
       List<String> referenceLinks = _referenceController.text
           .trim()
           .split(',')
@@ -152,8 +148,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
             .child(uid)
             .child(_fileName!);
         await storageRef.putFile(_selectedFile!);
-        final String fileUrl = await storageRef.getDownloadURL();
-        referenceLinks.add(fileUrl);
+        referenceLinks.add(await storageRef.getDownloadURL());
       }
 
       await _authService.updateUserProfile(
@@ -166,20 +161,21 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
           'hourlyRate': int.tryParse(_priceController.text) ?? 0,
           'availableDays': _selectedDays,
           'availableHours': _selectedHours,
-          'isApproved': false, // Admin onayına kadar false kalacak
+          'deliveryMode': _deliveryMode,
+          'coachCharacter': _coachCharacter, // YENİ VERİ
+          'isApproved': false,
           'isOnboardingCompleted': true,
         },
       );
 
-      if (mounted) {
+      if (mounted)
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const CoachHomeScreen()),
           (route) => false,
         );
-      }
     } catch (e) {
-      _showError("Bir hata oluştu: $e");
+      _showError("Hata: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -187,8 +183,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final double progressValue = (_currentIndex + 1) / 5;
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -221,7 +215,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: LinearProgressIndicator(
-                            value: progressValue,
+                            value: (_currentIndex + 1) / 6,
                             backgroundColor: Colors.white10,
                             color: ColorConstants.primaryColor,
                             minHeight: 6,
@@ -230,7 +224,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                       ),
                       const SizedBox(width: 15),
                       Text(
-                        "${_currentIndex + 1}/5",
+                        "${_currentIndex + 1}/6",
                         style: GoogleFonts.poppins(
                           color: Colors.white54,
                           fontWeight: FontWeight.bold,
@@ -251,6 +245,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                       _buildStep3References(),
                       _buildStep4LessonSport(),
                       _buildStep5Availability(),
+                      _buildStep6Character(),
                     ],
                   ),
                 ),
@@ -261,7 +256,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                           color: ColorConstants.primaryColor,
                         )
                       : CustomButton(
-                          text: _currentIndex == 4 ? "Tamamla" : "Devam Et",
+                          text: _currentIndex == 5 ? "Tamamla" : "Devam Et",
                           onPressed: _nextPage,
                         ),
                 ),
@@ -288,7 +283,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
               labelStyle: GoogleFonts.poppins(
                 color: isSelected
                     ? Colors.black
-                    : const Color.fromARGB(179, 0, 0, 0),
+                    : const Color.fromARGB(179, 9, 9, 9),
               ),
               selected: isSelected,
               selectedColor: ColorConstants.primaryColor,
@@ -386,12 +381,21 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
 
   Widget _buildStep4LessonSport() {
     return _buildStepContainer(
-      title: "Ders & Ücret",
-      subtitle: "İlk dersini oluştur, kursiyerlerini hemen bul!",
+      title: "Ders Detayları",
+      subtitle: "Branşını, ücretini ve ders verme şeklini belirle.",
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // BRANŞ SEÇİMİ
+            Text(
+              "Branş",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 10,
               runSpacing: 10,
@@ -413,7 +417,31 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 30),
+
+            const SizedBox(height: 24),
+
+            // DERS VERME ŞEKLİ (YENİ KISIM)
+            Text(
+              "Nasıl Ders Veriyorsun?",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _buildModeButton("Online", Icons.wifi),
+                const SizedBox(width: 10),
+                _buildModeButton("Yüzyüze", Icons.people),
+                const SizedBox(width: 10),
+                _buildModeButton("Hibrit(İkisi de)", Icons.compare_arrows),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // ÜCRET
             Text(
               "Saatlik Ücret (TL)",
               style: GoogleFonts.poppins(
@@ -442,6 +470,46 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Yardımcı buton widget'ı
+  Widget _buildModeButton(String label, IconData icon) {
+    final isSelected = _deliveryMode == label;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _deliveryMode = label),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? ColorConstants.primaryColor : Colors.white10,
+            borderRadius: BorderRadius.circular(12),
+            border: isSelected
+                ? Border.all(color: ColorConstants.primaryColor)
+                : null,
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? Colors.black : Colors.white,
+                size: 20,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: isSelected ? Colors.black : Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -510,6 +578,53 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // YENİ EKLENEN 6. ADIM: KARAKTER
+  Widget _buildStep6Character() {
+    return _buildStepContainer(
+      title: "Eğitmen Karakterin",
+      subtitle: "Tarzını seç, sana en uygun öğrencilerle eşleşmeni sağlayalım.",
+      child: ListView.separated(
+        itemCount: _characterList.length,
+        separatorBuilder: (c, i) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final char = _characterList[index];
+          final isSelected = _coachCharacter == char;
+          return ScaleButton(
+            onPressed: () => setState(() => _coachCharacter = char),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? ColorConstants.primaryColor
+                    : Colors.white10,
+                borderRadius: BorderRadius.circular(16),
+                border: isSelected
+                    ? Border.all(color: ColorConstants.primaryColor, width: 2)
+                    : null,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    char,
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.black : Colors.white,
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(Icons.check_circle, color: Colors.black),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

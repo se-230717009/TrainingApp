@@ -60,7 +60,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   ];
   final List<String> _goals = [
     "Kilo Vermek",
-    "Kas Yapmak",
+    "Kas Kazanmak",
     "Kondisyon",
     "Esneklik",
     "Yarışmaya Hazırlanmak",
@@ -204,7 +204,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF333030), Color(0xFF0A0A0A)],
+                  colors: [Color.fromARGB(255, 44, 43, 43), Color(0xFF0A0A0A)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -609,7 +609,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.black : Colors.white,
+                color: isSelected
+                    ? Colors.black
+                    : const Color.fromARGB(255, 0, 0, 0),
               ),
             ),
             if (isSelected) const Icon(Icons.check_circle, color: Colors.black),

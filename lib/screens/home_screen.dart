@@ -8,6 +8,7 @@ import '../widgets/scale_button.dart';
 import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'my_lessons_screen.dart';
+import 'coach_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Sporcu Bilgileri
   String _athleteName = "Sporcu";
+  String _athleteGoal = "";
   List<String> _interestedSports = [];
   String _preferredGender = "Farketmez";
   List<String> _availableDays = [];
@@ -41,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (doc.exists && mounted) {
       final data = doc.data()!;
       setState(() {
+        _athleteGoal = data['goal'] ?? "";
         _athleteName = data['name'] ?? "Sporcu";
         _interestedSports = List<String>.from(data['interestedSports'] ?? []);
         _preferredGender = data['preferredCoachGender'] ?? "Farketmez";
@@ -51,20 +54,45 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ALGORİTMA: Antrenöre puan veriyoruz. Cinsiyet uyarsa +10 puan, her ortak gün/saat için +1 puan.
+  // ALGORİTMA: Antrenöre puan veriyoruz.
   int _calculateMatchScore(Map<String, dynamic> coach) {
     int score = 0;
 
-    // Cinsiyet Uyumu
+    // 1. KARAKTER VE HEDEF UYUMU (EN YÜKSEK PUAN: +20)
+    String idealCoachCharacter = "";
+    switch (_athleteGoal) {
+      case "Kilo Vermek":
+        idealCoachCharacter = "Motivatör & Enerjik";
+        break;
+      case "Kas Yapmak":
+        idealCoachCharacter = "Disiplinli & Güç Odaklı";
+        break;
+      case "Kondisyon":
+        idealCoachCharacter = "Dinamik & Dayanıklılık Odaklı";
+        break;
+      case "Esneklik":
+        idealCoachCharacter = "Sakin & Beden Farkındalığı";
+        break;
+      case "Yarışmaya Hazırlanmak":
+        idealCoachCharacter = "Sert & Hedef Odaklı (Pro)";
+        break;
+    }
+
+    if (coach['coachCharacter'] == idealCoachCharacter) {
+      score += 20; // Tam isabet!
+    }
+
+    // 2. Cinsiyet Uyumu (+10 Puan)
     if (_preferredGender != "Farketmez" &&
         coach['gender'] == _preferredGender) {
       score += 10;
     }
 
-    // Gün Uyumu
+    // 3. Gün Uyumu (Ortak her gün için +1 Puan)
     List<String> coachDays = List<String>.from(coach['availableDays'] ?? []);
     score += coachDays.where((d) => _availableDays.contains(d)).length;
 
-    // Saat Uyumu
+    // 4. Saat Uyumu (Ortak her saat için +1 Puan)
     List<String> coachHours = List<String>.from(coach['availableHours'] ?? []);
     score += coachHours.where((h) => _availableHours.contains(h)).length;
 
@@ -413,7 +441,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<dynamic> hoursList = coachData['availableHours'] ?? [];
 
     return ScaleButton(
-      onPressed: () {},
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CoachDetailScreen(coachData: coachData),
+          ),
+        );
+      },
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -452,7 +487,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        "Onaylı Eğitmen",
+                        coachData['coachCharacter'] ?? "Onaylı Eğitmen",
                         style: GoogleFonts.poppins(
                           color: ColorConstants.primaryColor,
                           fontSize: 12,
