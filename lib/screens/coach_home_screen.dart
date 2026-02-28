@@ -8,6 +8,7 @@ import '../widgets/scale_button.dart';
 import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'coach_calender_screen.dart';
+import 'coach_messages_screen.dart';
 
 class CoachHomeScreen extends StatefulWidget {
   const CoachHomeScreen({super.key});
@@ -124,6 +125,13 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                   builder: (context) => const CoachCalendarScreen(),
                 ),
               );
+            } else if (value == 'mesajlarim') {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CoachMessagesScreen(),
+                ),
+              );
             }
           },
           itemBuilder: (context) => [
@@ -161,6 +169,23 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                 ],
               ),
             ),
+            PopupMenuItem(
+              value: 'mesajlarim',
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    "Mesajlarım",
+                    style: GoogleFonts.poppins(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
           ],
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -192,6 +217,48 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
           ),
         ),
         actions: [
+          ScaleButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CoachMessagesScreen(),
+                ),
+              );
+            },
+            child: Stack(
+              alignment: Alignment.topRight,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: const Icon(
+                    Icons.notifications_none_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                // Küçük kırmızı bildirim noktası
+                Positioned(
+                  right: 2,
+                  top: 2,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.black, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: ScaleButton(

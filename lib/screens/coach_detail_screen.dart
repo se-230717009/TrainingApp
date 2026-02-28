@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/scale_button.dart';
+import 'chat_screen.dart';
 
 class CoachDetailScreen extends StatelessWidget {
   final Map<String, dynamic> coachData;
@@ -20,6 +21,7 @@ class CoachDetailScreen extends StatelessWidget {
     final String bio = coachData['bio'] ?? "Henüz biyografi eklenmemiş.";
     final String lessonSport = coachData['lessonSport'] ?? "Genel";
     final String character = coachData['coachCharacter'] ?? "Belirtilmemiş";
+    final String coachUid = coachData['uid'] ?? '';
     final String deliveryMode =
         coachData['deliveryMode'] ?? "Online"; // Yeni veri
     final int price = coachData['hourlyRate'] ?? 0;
@@ -185,7 +187,17 @@ class CoachDetailScreen extends StatelessWidget {
                       // Mesaj Gönder Butonu
                       Expanded(
                         child: ScaleButton(
-                          onPressed: () {}, // Aktif Değil
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(
+                                  receiverId: coachUid,
+                                  receiverName: fullName,
+                                ),
+                              ),
+                            );
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             decoration: BoxDecoration(
@@ -332,6 +344,31 @@ class CoachDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
 
+                  // Branş (lessonSport burada kullanılıyor)
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.sports_gymnastics_rounded,
+                        color: ColorConstants.primaryColor,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Branş: ",
+                        style: GoogleFonts.poppins(color: Colors.white70),
+                      ),
+                      Text(
+                        lessonSport,
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
                   // Ders Verme Şekli
                   Row(
                     children: [
@@ -355,6 +392,43 @@ class CoachDetailScreen extends StatelessWidget {
                     ],
                   ),
 
+                  const SizedBox(height: 24),
+
+                  // --- UZMANLIK ALANLARI ---
+                  if (specialties.isNotEmpty) ...[
+                    Text(
+                      "Tüm Uzmanlık Alanları",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: specialties.map<Widget>((s) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white10,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            s.toString(),
+                            style: GoogleFonts.poppins(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                   const SizedBox(height: 12),
 
                   // Uzmanlık Alanları Chip List
