@@ -9,6 +9,7 @@ import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'coach_calender_screen.dart';
 import 'coach_messages_screen.dart';
+import 'coach_notification_screen.dart';
 
 class CoachHomeScreen extends StatefulWidget {
   const CoachHomeScreen({super.key});
@@ -222,7 +223,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const CoachMessagesScreen(),
+                  builder: (context) => const CoachNotificationsScreen(),
                 ),
               );
             },

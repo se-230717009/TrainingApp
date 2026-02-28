@@ -9,6 +9,7 @@ import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'my_lessons_screen.dart';
 import 'coach_detail_screen.dart';
+import 'dart:async';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,11 +29,42 @@ class _HomeScreenState extends State<HomeScreen> {
   String _preferredGender = "Farketmez";
   List<String> _availableDays = [];
   List<String> _availableHours = [];
+  StreamSubscription<QuerySnapshot>? _lessonsSubscription;
+  List<String> _bookedCoachIds = [];
 
   @override
   void initState() {
     super.initState();
     _loadAthleteData();
+    _listenToBookedLessons();
+  }
+
+  void _listenToBookedLessons() {
+    _lessonsSubscription = FirebaseFirestore.instance
+        .collection('lessons')
+        .where('athleteId', isEqualTo: _uid)
+        .snapshots()
+        .listen((snapshot) {
+          if (mounted) {
+            setState(() {
+              // Sadece 'pending' (bekliyor) veya 'approved' (onaylandı) olanları alıyoruz
+              _bookedCoachIds = snapshot.docs
+                  .where(
+                    (doc) =>
+                        doc['status'] == 'pending' ||
+                        doc['status'] == 'approved',
+                  )
+                  .map((doc) => doc['coachId'] as String)
+                  .toList();
+            });
+          }
+        });
+  }
+
+  @override
+  void dispose() {
+    _lessonsSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadAthleteData() async {
@@ -358,6 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 // EKRANI İKİYE BÖLME MANTIĞI
                 for (var doc in snapshot.data!.docs) {
                   final coach = doc.data() as Map<String, dynamic>;
+                  coach['uid'] = doc.id;
                   final lessonSport = coach['lessonSport'] ?? '';
 
                   if (_interestedSports.contains(lessonSport)) {
@@ -427,6 +460,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- ANTRENÖR / DERS KARTI (Fiyat Eklenmiş Halde) ---
+  // --- ANTRENÖR / DERS KARTI ---
   Widget _buildCoachCard(Map<String, dynamic> coachData) {
     final String name = coachData['name'] ?? '';
     final String surname = coachData['surname'] ?? '';
@@ -440,6 +474,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<dynamic> daysList = coachData['availableDays'] ?? [];
     final List<dynamic> hoursList = coachData['availableHours'] ?? [];
 
+    // HOCADAN DERS ALINMIŞ MI KONTROLÜ
+    final bool isBooked = _bookedCoachIds.contains(coachData['uid']);
+
     return ScaleButton(
       onPressed: () {
         Navigator.push(
@@ -452,9 +489,15 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: isBooked
+              ? Colors.green.withOpacity(0.05)
+              : Colors.white.withOpacity(
+                  0.05,
+                ), // Alındıysa kart hafif yeşilimsi olur
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white10),
+          border: Border.all(
+            color: isBooked ? Colors.green.withOpacity(0.3) : Colors.white10,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,26 +540,51 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                // SAATLİK ÜCRET BURADA GÖZÜKÜYOR
-                if (hourlyRate > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white10,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      "$hourlyRate ₺ / Saat",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                // SAĞ ÜST KÖŞE (ROZET VE FİYAT)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (isBooked)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          "✅ Alındı",
+                          style: GoogleFonts.poppins(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
+                    if (hourlyRate > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white10,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          "$hourlyRate ₺ / Saat",
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ],
             ),
             const Padding(

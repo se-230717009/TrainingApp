@@ -1,31 +1,596 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/scale_button.dart';
 import 'chat_screen.dart';
 
-class CoachDetailScreen extends StatelessWidget {
+class CoachDetailScreen extends StatefulWidget {
   final Map<String, dynamic> coachData;
 
   const CoachDetailScreen({super.key, required this.coachData});
 
   @override
+  State<CoachDetailScreen> createState() => _CoachDetailScreenState();
+}
+
+class _CoachDetailScreenState extends State<CoachDetailScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late String coachUid;
+
+  @override
+  void initState() {
+    super.initState();
+    coachUid = widget.coachData['uid'] ?? '';
+  }
+
+  // --- REZERVASYON / DERS ALMA PENCERESİ (ÇOKLU SEÇİM) ---
+  void _showBookingModal(
+    List<dynamic> days,
+    List<dynamic> hours,
+    String lessonSport,
+    int price,
+  ) {
+    List<String> selectedDays = [];
+    List<String> selectedHours = [];
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[700],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      "Ders Talebi Oluştur",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // GÜN SEÇİMİ (Çoklu)
+                    Text(
+                      "Gün Seçin (Birden fazla seçebilirsiniz)",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: days.map((day) {
+                        final isSelected = selectedDays.contains(
+                          day.toString(),
+                        );
+                        return ChoiceChip(
+                          label: Text(day.toString()),
+                          selected: isSelected,
+                          selectedColor: ColorConstants.primaryColor,
+                          backgroundColor: Colors.white10,
+                          onSelected: (val) {
+                            setModalState(() {
+                              if (val)
+                                selectedDays.add(day.toString());
+                              else
+                                selectedDays.remove(day.toString());
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // SAAT SEÇİMİ (Çoklu)
+                    Text(
+                      "Saat Seçin (Birden fazla seçebilirsiniz)",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: hours.map((hour) {
+                        final isSelected = selectedHours.contains(
+                          hour.toString(),
+                        );
+                        return ChoiceChip(
+                          label: Text(hour.toString()),
+                          selected: isSelected,
+                          selectedColor: ColorConstants.primaryColor,
+                          backgroundColor: Colors.white10,
+                          onSelected: (val) {
+                            setModalState(() {
+                              if (val)
+                                selectedHours.add(hour.toString());
+                              else
+                                selectedHours.remove(hour.toString());
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // ONAY BUTONU
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed:
+                            (selectedDays.isEmpty ||
+                                selectedHours.isEmpty ||
+                                isSubmitting)
+                            ? null
+                            : () async {
+                                setModalState(() => isSubmitting = true);
+                                await _submitLessonRequest(
+                                  selectedDays,
+                                  selectedHours,
+                                  lessonSport,
+                                  price,
+                                );
+                                if (mounted) {
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        "Ders talebi eğitmenine iletildi!",
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ColorConstants.primaryColor,
+                          disabledBackgroundColor: Colors.white10,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: isSubmitting
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.black,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                "Talebi Gönder",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _submitLessonRequest(
+    List<String> selectedDays,
+    List<String> selectedHours,
+    String sport,
+    int price,
+  ) async {
+    final currentUser = _auth.currentUser!;
+    final myDoc = await _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .get();
+    final String myName =
+        "${myDoc.data()?['name'] ?? ''} ${myDoc.data()?['surname'] ?? ''}"
+            .trim();
+    final String? myImage = myDoc.data()?['profileImageUrl'];
+
+    final String coachFullName =
+        "${widget.coachData['name'] ?? ''} ${widget.coachData['surname'] ?? ''}"
+            .trim();
+
+    await _firestore.collection('lessons').add({
+      'coachId': coachUid,
+      'coachName': coachFullName,
+      'coachImage': widget.coachData['profileImageUrl'],
+      'athleteId': currentUser.uid,
+      'athleteName': myName.isEmpty ? "Öğrenci" : myName,
+      'athleteImage': myImage,
+      'sport': sport,
+      'days': selectedDays,
+      'hours': selectedHours,
+      'price': price,
+      'status': 'pending',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // --- YORUM PENCERELERİ ---
+  void _showAddReviewModal() {
+    int selectedStar = 5;
+    TextEditingController commentController = TextEditingController();
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[700],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    "Eğitmeni Değerlendir",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < selectedStar
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: Colors.amber,
+                          size: 40,
+                        ),
+                        onPressed: () =>
+                            setModalState(() => selectedStar = index + 1),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: commentController,
+                    maxLines: 4,
+                    style: GoogleFonts.poppins(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: "Eğitmen hakkında ne düşünüyorsun?",
+                      hintStyle: GoogleFonts.poppins(color: Colors.white30),
+                      filled: true,
+                      fillColor: Colors.black26,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              if (commentController.text.trim().isEmpty) return;
+                              setModalState(() => isSubmitting = true);
+                              await _submitReview(
+                                selectedStar,
+                                commentController.text.trim(),
+                              );
+                              if (mounted) Navigator.pop(context);
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorConstants.primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.black,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              "Yorumu Gönder",
+                              style: GoogleFonts.poppins(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _submitReview(int rating, String comment) async {
+    final currentUser = _auth.currentUser!;
+    final myDoc = await _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .get();
+    final String myName =
+        "${myDoc.data()?['name'] ?? ''} ${myDoc.data()?['surname'] ?? ''}"
+            .trim();
+    final String? myImage = myDoc.data()?['profileImageUrl'];
+
+    await _firestore
+        .collection('users')
+        .doc(coachUid)
+        .collection('reviews')
+        .doc(currentUser.uid)
+        .set({
+          'userId': currentUser.uid,
+          'userName': myName.isEmpty ? "Öğrenci" : myName,
+          'userImage': myImage,
+          'rating': rating,
+          'comment': comment,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+
+    final reviewsSnapshot = await _firestore
+        .collection('users')
+        .doc(coachUid)
+        .collection('reviews')
+        .get();
+    double totalScore = 0;
+    for (var doc in reviewsSnapshot.docs) {
+      totalScore += (doc.data()['rating'] ?? 0);
+    }
+    double newAverage = totalScore / reviewsSnapshot.docs.length;
+
+    await _firestore.collection('users').doc(coachUid).update({
+      'rating': newAverage,
+      'reviewCount': reviewsSnapshot.docs.length,
+    });
+  }
+
+  void _showAllReviewsModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 16),
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[700],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Tüm Yorumlar",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _firestore
+                        .collection('users')
+                        .doc(coachUid)
+                        .collection('reviews')
+                        .orderBy('timestamp', descending: true)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting)
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: ColorConstants.primaryColor,
+                          ),
+                        );
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                        return Center(
+                          child: Text(
+                            "Henüz yorum yapılmamış.",
+                            style: GoogleFonts.poppins(color: Colors.white54),
+                          ),
+                        );
+
+                      return ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
+                        itemCount: snapshot.data!.docs.length,
+                        itemBuilder: (context, index) {
+                          var review =
+                              snapshot.data!.docs[index].data()
+                                  as Map<String, dynamic>;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 20,
+                                      backgroundColor: Colors.white10,
+                                      backgroundImage:
+                                          review['userImage'] != null
+                                          ? NetworkImage(review['userImage'])
+                                          : null,
+                                      child: review['userImage'] == null
+                                          ? const Icon(
+                                              Icons.person,
+                                              color: Colors.white54,
+                                              size: 20,
+                                            )
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            review['userName'] ?? "Öğrenci",
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          Row(
+                                            children: List.generate(
+                                              5,
+                                              (starIndex) => Icon(
+                                                starIndex <
+                                                        (review['rating'] ?? 5)
+                                                    ? Icons.star_rounded
+                                                    : Icons.star_border_rounded,
+                                                color: Colors.amber,
+                                                size: 14,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  review['comment'] ?? "",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Verileri güvenli çekelim
-    final String name = coachData['name'] ?? '';
-    final String surname = coachData['surname'] ?? '';
-    final String fullName = "$name $surname".trim().isEmpty
+    final String fullName =
+        "${widget.coachData['name'] ?? ''} ${widget.coachData['surname'] ?? ''}"
+            .trim()
+            .isEmpty
         ? "Eğitmen"
-        : "$name $surname";
-    final String? profileImageUrl = coachData['profileImageUrl'];
-    final String bio = coachData['bio'] ?? "Henüz biyografi eklenmemiş.";
-    final String lessonSport = coachData['lessonSport'] ?? "Genel";
-    final String character = coachData['coachCharacter'] ?? "Belirtilmemiş";
-    final String coachUid = coachData['uid'] ?? '';
-    final String deliveryMode =
-        coachData['deliveryMode'] ?? "Online"; // Yeni veri
-    final int price = coachData['hourlyRate'] ?? 0;
-    final List<dynamic> specialties = coachData['specialties'] ?? [];
+        : "${widget.coachData['name']} ${widget.coachData['surname']}";
+    final String? profileImageUrl = widget.coachData['profileImageUrl'];
+    final String bio = widget.coachData['bio'] ?? "Henüz biyografi eklenmemiş.";
+    final String lessonSport = widget.coachData['lessonSport'] ?? "Genel";
+    final String character =
+        widget.coachData['coachCharacter'] ?? "Belirtilmemiş";
+    final String deliveryMode = widget.coachData['deliveryMode'] ?? "Online";
+    final int price = widget.coachData['hourlyRate'] ?? 0;
+    final List<dynamic> specialties = widget.coachData['specialties'] ?? [];
+    final List<dynamic> days = widget.coachData['availableDays'] ?? [];
+    final List<dynamic> hours = widget.coachData['availableHours'] ?? [];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -34,11 +599,9 @@ class CoachDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- ÜST KISIM (FOTOĞRAF & BACK BUTTON & KALP) ---
             Stack(
               alignment: Alignment.bottomCenter,
               children: [
-                // Arka Plan Resmi (Büyük Fotoğraf)
                 Container(
                   height: 350,
                   width: double.infinity,
@@ -61,7 +624,6 @@ class CoachDetailScreen extends StatelessWidget {
                         )
                       : null,
                 ),
-                // Gölge Efekti (Alttan yukarı siyahlık)
                 Container(
                   height: 350,
                   decoration: BoxDecoration(
@@ -76,7 +638,6 @@ class CoachDetailScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Geri Butonu (Sol Üst)
                 Positioned(
                   top: 50,
                   left: 20,
@@ -97,14 +658,11 @@ class CoachDetailScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                // Kalp Butonu (Sağ Üst - Favori)
                 Positioned(
                   top: 50,
                   right: 20,
                   child: ScaleButton(
-                    onPressed: () {
-                      // Favori işlemi sonra yapılacak
-                    },
+                    onPressed: () {},
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -128,7 +686,6 @@ class CoachDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- İSİM & KARAKTER ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -155,7 +712,6 @@ class CoachDetailScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // Ücret Bilgisi (Köşede)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -178,25 +734,25 @@ class CoachDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 20),
 
-                  // --- BUTONLAR (MESAJ & ÖN GÖRÜŞME) ---
+                  // YENİ BUTON DÜZENİ (DÜZELTİLEN KISIM)
                   Row(
                     children: [
-                      // Mesaj Gönder Butonu
+                      // 1. MESAJ GÖNDER BUTONU
                       Expanded(
                         child: ScaleButton(
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatScreen(
-                                  receiverId: coachUid,
-                                  receiverName: fullName,
+                            if (coachUid.isNotEmpty)
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ChatScreen(
+                                    receiverId: coachUid,
+                                    receiverName: fullName,
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -215,7 +771,7 @@ class CoachDetailScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  "Mesaj Gönder",
+                                  "Mesaj",
                                   style: GoogleFonts.poppins(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
@@ -227,92 +783,247 @@ class CoachDetailScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // Ön Görüşme Talep Et Butonu (Dolu Renk)
-                      Expanded(
-                        child: ScaleButton(
-                          onPressed: () {}, // Aktif Değil
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            decoration: BoxDecoration(
-                              color: ColorConstants.primaryColor,
-                              borderRadius: BorderRadius.circular(14),
+
+                      // 2. DERSİ AL / DERS ALINDI KISMI (DİNAMİK)
+                      StreamBuilder<QuerySnapshot>(
+                        stream: _firestore
+                            .collection('lessons')
+                            .where(
+                              'athleteId',
+                              isEqualTo: _auth.currentUser!.uid,
+                            )
+                            .where('coachId', isEqualTo: coachUid)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          bool isBooked = false;
+
+                          if (snapshot.hasData) {
+                            isBooked = snapshot.data!.docs.any(
+                              (doc) =>
+                                  doc['status'] == 'pending' ||
+                                  doc['status'] == 'approved',
+                            );
+                          }
+
+                          if (isBooked) {
+                            // ALINDI DURUMU: Statik yeşil kutu (Tıklanamaz)
+                            return Expanded(
+                              flex: 2,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                  horizontal: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: Colors.green.withOpacity(0.5),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle_rounded,
+                                      color: Colors.green,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        "Ders Alındı",
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          } else {
+                            // ALINMADI DURUMU: Normal Dersi Al Butonu
+                            return Expanded(
+                              flex: 2,
+                              child: ScaleButton(
+                                onPressed: () => _showBookingModal(
+                                  days,
+                                  hours,
+                                  lessonSport,
+                                  price,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: ColorConstants.primaryColor,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.bolt_rounded,
+                                        color: Colors.black,
+                                        size: 22,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Flexible(
+                                        child: Text(
+                                          "Dersi Al",
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.black,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // UZUN ÖN GÖRÜŞME BUTONU
+                  ScaleButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            "Görüntülü ön görüşme özelliği yakında aktif edilecek!",
+                            style: GoogleFonts.poppins(),
+                          ),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.videocam_outlined,
+                            color: Colors.white70,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Ön Görüşme Talep Et (10 Dk)",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w600,
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // PUAN KISMI
+                  StreamBuilder<DocumentSnapshot>(
+                    stream: _firestore
+                        .collection('users')
+                        .doc(coachUid)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      double avgRating = 5.0;
+                      int revCount = 0;
+                      if (snapshot.hasData && snapshot.data!.exists) {
+                        var data =
+                            snapshot.data!.data() as Map<String, dynamic>;
+                        avgRating = (data['rating'] ?? 5.0).toDouble();
+                        revCount = data['reviewCount'] ?? 0;
+                      }
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
                               children: [
                                 const Icon(
-                                  Icons.calendar_today_rounded,
-                                  color: Colors.black,
-                                  size: 20,
+                                  Icons.star_rounded,
+                                  color: Colors.amber,
+                                  size: 28,
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  "Ön Görüşme",
+                                  avgRating.toStringAsFixed(1),
                                   style: GoogleFonts.poppins(
-                                    color: Colors.black,
+                                    color: Colors.white,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "($revCount Yorum)",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white54,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  onPressed: _showAddReviewModal,
+                                  icon: const Icon(
+                                    Icons.edit_square,
+                                    color: ColorConstants.primaryColor,
+                                    size: 20,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // --- PUAN VE YORUMLAR ---
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              color: Colors.amber,
-                              size: 28,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              "5.0",
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "(0 Yorum)",
-                              style: GoogleFonts.poppins(
-                                color: Colors.white54,
-                                fontSize: 13,
+                            TextButton(
+                              onPressed: revCount > 0
+                                  ? _showAllReviewsModal
+                                  : null,
+                              child: Text(
+                                "Tümünü Gör",
+                                style: GoogleFonts.poppins(
+                                  color: revCount > 0
+                                      ? Colors.white70
+                                      : Colors.white24,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        Text(
-                          "Tümünü Gör",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white38,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-
                   const SizedBox(height: 24),
 
-                  // --- HAKKINDA (BİO) ---
+                  // DETAYLAR
                   Text(
                     "Hakkında",
                     style: GoogleFonts.poppins(
@@ -330,10 +1041,7 @@ class CoachDetailScreen extends StatelessWidget {
                       height: 1.6,
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // --- ÖZELLİKLER (UZMANLIK & DERS ŞEKLİ) ---
                   Text(
                     "Ders Detayları",
                     style: GoogleFonts.poppins(
@@ -343,8 +1051,6 @@ class CoachDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // Branş (lessonSport burada kullanılıyor)
                   Row(
                     children: [
                       const Icon(
@@ -366,10 +1072,7 @@ class CoachDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 12),
-
-                  // Ders Verme Şekli
                   Row(
                     children: [
                       const Icon(
@@ -391,10 +1094,8 @@ class CoachDetailScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 24),
 
-                  // --- UZMANLIK ALANLARI ---
                   if (specialties.isNotEmpty) ...[
                     Text(
                       "Tüm Uzmanlık Alanları",
@@ -408,53 +1109,29 @@ class CoachDetailScreen extends StatelessWidget {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: specialties.map<Widget>((s) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white10,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            s.toString(),
-                            style: GoogleFonts.poppins(
-                              color: Colors.white70,
-                              fontSize: 12,
+                      children: specialties
+                          .map<Widget>(
+                            (s) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white10,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                s.toString(),
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          )
+                          .toList(),
                     ),
                   ],
-                  const SizedBox(height: 12),
-
-                  // Uzmanlık Alanları Chip List
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: specialties.map<Widget>((s) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          s.toString(),
-                          style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
                 ],
               ),
             ),

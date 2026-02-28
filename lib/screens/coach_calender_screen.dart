@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:intl/intl.dart'; // Geri geldi :)
-import 'package:intl/date_symbol_data_local.dart'; // Türkçe formatı yüklemek için gerekli
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import '../core/constants/color_constants.dart';
+import 'chat_screen.dart';
 
 class CoachCalendarScreen extends StatefulWidget {
   const CoachCalendarScreen({super.key});
@@ -15,41 +18,54 @@ class CoachCalendarScreen extends StatefulWidget {
 class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-
-  // SAHTE VERİLER (Test Amaçlı)
-  final Map<DateTime, List<Map<String, dynamic>>> _dummyLessons = {
-    DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day): [
-      {
-        'athleteName': 'Ahmet Yılmaz',
-        'time': '14:00 - 15:00',
-        'sport': 'Fitness',
-        'gender': 'Erkek',
-      },
-    ],
-    DateTime(
-      DateTime.now().year,
-      DateTime.now().month,
-      DateTime.now().day,
-    ).add(const Duration(days: 1)): [
-      {
-        'athleteName': 'Ayşe Demir',
-        'time': '10:00 - 11:00',
-        'sport': 'Pilates',
-        'gender': 'Kadın',
-      },
-    ],
-  };
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
     super.initState();
-    // Türkçe tarih formatını başlatıyoruz
     initializeDateFormatting('tr_TR', null);
+    _selectedDay = _focusedDay;
   }
 
-  List<Map<String, dynamic>> _getLessonsForDay(DateTime day) {
-    final normalizedDay = DateTime(day.year, day.month, day.day);
-    return _dummyLessons[normalizedDay] ?? [];
+  // Takvimin (DateTime) verdiği gün numarasını Türkçe gün ismine çevirir
+  String _getWeekdayString(int weekday) {
+    switch (weekday) {
+      case 1:
+        return "Pazartesi";
+      case 2:
+        return "Salı";
+      case 3:
+        return "Çarşamba";
+      case 4:
+        return "Perşembe";
+      case 5:
+        return "Cuma";
+      case 6:
+        return "Cumartesi";
+      case 7:
+        return "Pazar";
+      default:
+        return "";
+    }
+  }
+
+  // O gün için onaylanmış dersleri filtreler
+  List<Map<String, dynamic>> _getLessonsForDay(
+    DateTime day,
+    List<QueryDocumentSnapshot> allLessons,
+  ) {
+    String dayName = _getWeekdayString(day.weekday);
+    List<Map<String, dynamic>> dayLessons = [];
+
+    for (var doc in allLessons) {
+      var data = doc.data() as Map<String, dynamic>;
+      List<dynamic> days = data['days'] ?? [];
+      // Eğer dersin günleri arasında bu gün (Örn: Pazartesi) varsa listeye ekle
+      if (days.contains(dayName)) {
+        dayLessons.add(data);
+      }
+    }
+    return dayLessons;
   }
 
   // --- ALTTAN AÇILAN ÖĞRENCİ DETAY PANELİ ---
@@ -102,12 +118,12 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                       CircleAvatar(
                         radius: 24,
                         backgroundColor: Colors.white10,
-                        child: Icon(
-                          lesson['gender'] == 'Kadın'
-                              ? Icons.face_3
-                              : Icons.face,
-                          color: Colors.white54,
-                        ),
+                        backgroundImage: lesson['athleteImage'] != null
+                            ? NetworkImage(lesson['athleteImage'])
+                            : null,
+                        child: lesson['athleteImage'] == null
+                            ? const Icon(Icons.person, color: Colors.white54)
+                            : null,
                       ),
                       const SizedBox(width: 16),
                       Expanded(
@@ -133,7 +149,18 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.pop(context); // Paneli kapat
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChatScreen(
+                                receiverId: lesson['athleteId'],
+                                receiverName: lesson['athleteName'],
+                              ),
+                            ),
+                          ); // Mesaja git
+                        },
                         icon: const Icon(
                           Icons.chat_bubble_outline_rounded,
                           color: ColorConstants.primaryColor,
@@ -143,14 +170,13 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 Row(
                   children: [
                     Expanded(
                       child: _buildInfoCard(
                         Icons.access_time_rounded,
-                        "Saat",
-                        lesson['time'],
+                        "Saatler",
+                        (lesson['hours'] as List).join('\n'),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -225,138 +251,164 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          // TAKVİM KISMI
-          Container(
-            margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: TableCalendar(
-              locale: 'tr_TR', // İŞTE BURASI TÜRKÇE YAPIYOR 🇹🇷
-              firstDay: DateTime.utc(2023, 1, 1),
-              lastDay: DateTime.utc(2030, 12, 31),
-              focusedDay: _focusedDay,
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              onDaySelected: (selectedDay, focusedDay) {
-                setState(() {
-                  _selectedDay = selectedDay;
-                  _focusedDay = focusedDay;
-                });
-              },
-              eventLoader: _getLessonsForDay,
-              startingDayOfWeek:
-                  StartingDayOfWeek.monday, // Haftayı Pazartesi başlat
-              // Takvim Stili
-              calendarStyle: CalendarStyle(
-                defaultTextStyle: GoogleFonts.poppins(color: Colors.white),
-                weekendTextStyle: GoogleFonts.poppins(
-                  color: Colors.redAccent.withOpacity(0.8),
-                ), // Hafta sonu hafif kırmızı
-                outsideTextStyle: GoogleFonts.poppins(color: Colors.white24),
-                todayDecoration: BoxDecoration(
-                  color: Colors.white10,
-                  shape: BoxShape.circle,
-                ),
-                selectedDecoration: const BoxDecoration(
-                  color: ColorConstants.primaryColor,
-                  shape: BoxShape.circle,
-                ),
-                selectedTextStyle: GoogleFonts.poppins(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-                markerDecoration: const BoxDecoration(
-                  color: ColorConstants.primaryColor,
-                  shape: BoxShape.circle,
-                ),
+
+      // VERİTABANINDAN SADECE ONAYLANAN DERSLERİ ÇEKİYORUZ
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('lessons')
+            .where('coachId', isEqualTo: _auth.currentUser!.uid)
+            .where('status', isEqualTo: 'approved') // Sadece onaylı dersler
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting)
+            return const Center(
+              child: CircularProgressIndicator(
+                color: ColorConstants.primaryColor,
               ),
+            );
 
-              // Başlık Stili (Şubat 2026)
-              headerStyle: HeaderStyle(
-                titleCentered: true,
-                formatButtonVisible: false,
-                titleTextStyle: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-                leftChevronIcon: const Icon(
-                  Icons.chevron_left,
-                  color: Colors.white,
-                ),
-                rightChevronIcon: const Icon(
-                  Icons.chevron_right,
-                  color: Colors.white,
-                ),
-              ),
+          List<QueryDocumentSnapshot> approvedLessons =
+              snapshot.data?.docs ?? [];
 
-              // Gün İsimleri Stili (Pzt, Sal, Çar...)
-              daysOfWeekStyle: DaysOfWeekStyle(
-                weekdayStyle: GoogleFonts.poppins(color: Colors.white70),
-                weekendStyle: GoogleFonts.poppins(
-                  color: Colors.redAccent.withOpacity(0.5),
+          return Column(
+            children: [
+              // TAKVİM KISMI
+              Container(
+                margin: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white10),
                 ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // SEÇİLEN TARİH BAŞLIĞI
-          if (_selectedDay != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.date_range,
-                    color: ColorConstants.primaryColor,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat(
-                      'd MMMM yyyy, EEEE',
-                      'tr_TR',
-                    ).format(_selectedDay!), // "24 Şubat 2026, Salı" gibi yazar
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
+                child: TableCalendar(
+                  locale: 'tr_TR',
+                  firstDay: DateTime.utc(2023, 1, 1),
+                  lastDay: DateTime.utc(2030, 12, 31),
+                  focusedDay: _focusedDay,
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _selectedDay = selectedDay;
+                      _focusedDay = focusedDay;
+                    });
+                  },
+                  // Noktaları (Marker) koymak için veriyi süzüyoruz
+                  eventLoader: (day) => _getLessonsForDay(day, approvedLessons),
+                  startingDayOfWeek: StartingDayOfWeek.monday,
+                  calendarStyle: CalendarStyle(
+                    defaultTextStyle: GoogleFonts.poppins(color: Colors.white),
+                    weekendTextStyle: GoogleFonts.poppins(
+                      color: Colors.redAccent.withOpacity(0.8),
+                    ),
+                    outsideTextStyle: GoogleFonts.poppins(
+                      color: Colors.white24,
+                    ),
+                    todayDecoration: const BoxDecoration(
+                      color: Colors.white10,
+                      shape: BoxShape.circle,
+                    ),
+                    selectedDecoration: const BoxDecoration(
+                      color: ColorConstants.primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                    selectedTextStyle: GoogleFonts.poppins(
+                      color: Colors.black,
                       fontWeight: FontWeight.bold,
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-          // SEÇİLEN GÜNÜN DERSLERİ
-          Expanded(
-            child: _selectedDay == null
-                ? Center(
-                    child: Text(
-                      "Dersleri görmek için bir gün seçin.",
-                      style: GoogleFonts.poppins(color: Colors.white54),
+                    markerDecoration: const BoxDecoration(
+                      color: ColorConstants.primaryColor,
+                      shape: BoxShape.circle,
                     ),
-                  )
-                : _buildLessonListForDay(_selectedDay!),
-          ),
-        ],
+                  ),
+                  headerStyle: HeaderStyle(
+                    titleCentered: true,
+                    formatButtonVisible: false,
+                    titleTextStyle: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    leftChevronIcon: const Icon(
+                      Icons.chevron_left,
+                      color: Colors.white,
+                    ),
+                    rightChevronIcon: const Icon(
+                      Icons.chevron_right,
+                      color: Colors.white,
+                    ),
+                  ),
+                  daysOfWeekStyle: DaysOfWeekStyle(
+                    weekdayStyle: GoogleFonts.poppins(color: Colors.white70),
+                    weekendStyle: GoogleFonts.poppins(
+                      color: Colors.redAccent.withOpacity(0.5),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+              if (_selectedDay != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.date_range,
+                        color: ColorConstants.primaryColor,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        DateFormat(
+                          'd MMMM yyyy, EEEE',
+                          'tr_TR',
+                        ).format(_selectedDay!),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // SEÇİLEN GÜNÜN DERSLERİ
+              Expanded(
+                child: _selectedDay == null
+                    ? Center(
+                        child: Text(
+                          "Dersleri görmek için bir gün seçin.",
+                          style: GoogleFonts.poppins(color: Colors.white54),
+                        ),
+                      )
+                    : _buildLessonListForDay(_selectedDay!, approvedLessons),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildLessonListForDay(DateTime day) {
-    final lessons = _getLessonsForDay(day);
+  Widget _buildLessonListForDay(
+    DateTime day,
+    List<QueryDocumentSnapshot> allLessons,
+  ) {
+    final lessons = _getLessonsForDay(day, allLessons);
 
     if (lessons.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_busy_rounded, color: Colors.white24, size: 50),
+            const Icon(
+              Icons.event_busy_rounded,
+              color: Colors.white24,
+              size: 50,
+            ),
             const SizedBox(height: 16),
             Text(
               "Bu tarihte dersiniz bulunmuyor.",
@@ -400,7 +452,7 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
               ),
             ),
             subtitle: Text(
-              "${lesson['time']} • ${lesson['sport']}",
+              "${(lesson['hours'] as List).join(', ')} • ${lesson['sport']}",
               style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
             ),
             trailing: const Icon(
