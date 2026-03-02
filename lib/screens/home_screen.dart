@@ -133,12 +133,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _signOut() async {
     await _authService.signOut();
-    if (mounted)
+    if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
+    }
   }
 
   // --- AYARLAR MENÜSÜ ---
@@ -375,14 +376,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   .where('isApproved', isEqualTo: true)
                   .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting)
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
                     child: CircularProgressIndicator(
                       color: ColorConstants.primaryColor,
                     ),
                   );
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return _buildEmptyState();
+                }
 
                 List<Map<String, dynamic>> perfectMatches = [];
                 List<Map<String, dynamic>> alternativeMatches = [];

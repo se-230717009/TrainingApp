@@ -23,7 +23,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   int _currentIndex = 0;
   bool _isLoading = false;
 
-  List<String> _selectedSpecialties = [];
+  final List<String> _selectedSpecialties = [];
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
   File? _selectedFile;
@@ -31,8 +31,8 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
 
   String? _selectedLessonSport;
   final TextEditingController _priceController = TextEditingController();
-  List<String> _selectedDays = [];
-  List<String> _selectedHours = [];
+  final List<String> _selectedDays = [];
+  final List<String> _selectedHours = [];
   String? _coachCharacter;
   String? _deliveryMode;
 
@@ -81,34 +81,42 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
       );
-      if (result != null)
+      if (result != null) {
         setState(() {
           _selectedFile = File(result.files.single.path!);
           _fileName = result.files.single.name;
         });
+      }
     } catch (e) {
       _showError("Dosya seçilirken bir hata oluştu: $e");
     }
   }
 
   void _nextPage() {
-    if (_currentIndex == 0 && _selectedSpecialties.isEmpty)
+    if (_currentIndex == 0 && _selectedSpecialties.isEmpty) {
       return _showError("Lütfen en az bir uzmanlık alanı seçin.");
+    }
     if (_currentIndex == 1 &&
         (_bioController.text.trim().isEmpty ||
-            _bioController.text.trim().length < 20))
+            _bioController.text.trim().length < 20)) {
       return _showError("Bio en az 20 karakter olmalıdır.");
+    }
     if (_currentIndex == 2 &&
         _referenceController.text.trim().isEmpty &&
-        _selectedFile == null)
+        _selectedFile == null) {
       return _showError("Lütfen bir referans linki girin veya belge yükleyin.");
+    }
     if (_currentIndex == 3 &&
-        (_selectedLessonSport == null || _priceController.text.isEmpty))
+        (_selectedLessonSport == null || _priceController.text.isEmpty)) {
       return _showError("Lütfen branş,ders şekli ve ücret belirleyin.");
-    if (_currentIndex == 4 && (_selectedDays.isEmpty || _selectedHours.isEmpty))
+    }
+    if (_currentIndex == 4 &&
+        (_selectedDays.isEmpty || _selectedHours.isEmpty)) {
       return _showError("Lütfen en az bir gün ve saat aralığı seçin.");
-    if (_currentIndex == 5 && _coachCharacter == null)
+    }
+    if (_currentIndex == 5 && _coachCharacter == null) {
       return _showError("Lütfen eğitmen karakterinizi seçin.");
+    }
 
     if (_currentIndex < 5) {
       // 6 Adım oldu (0-5)
@@ -168,12 +176,13 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         },
       );
 
-      if (mounted)
+      if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const CoachHomeScreen()),
           (route) => false,
         );
+      }
     } catch (e) {
       _showError("Hata: $e");
     } finally {

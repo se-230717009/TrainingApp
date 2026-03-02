@@ -27,13 +27,10 @@ class AuthService {
       await _ensureGoogleInitialized();
 
       // 3. DEĞİŞİKLİK: signIn() yerine authenticate() kullanıyoruz
-      final GoogleSignInAccount? googleUser = await _googleSignIn
-          .authenticate();
-      if (googleUser == null) return "Google girişi iptal edildi.";
+      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
 
       // Kimlik Doğrulama Bilgilerini Al
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
       // 4. DEĞİŞİKLİK: Yeni sürümde accessToken ayrı bir yere taşındı,
       // Firebase'e giriş yapmak için sadece idToken vermemiz yeterli.
@@ -196,7 +193,7 @@ class AuthService {
       await _firestore.collection('users').doc(uid).update(data);
     } catch (e) {
       print("Profil güncelleme hatası: $e");
-      throw e; // Hatayı yukarı fırlat
+      rethrow; // Hatayı yukarı fırlat
     }
   }
 }

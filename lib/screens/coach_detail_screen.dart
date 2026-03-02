@@ -26,7 +26,7 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
     coachUid = widget.coachData['uid'] ?? '';
   }
 
-  // --- REZERVASYON / DERS ALMA PENCERESİ (ÇOKLU SEÇİM) ---
+  // --- REZERVASYON / DERS ALMA PENCERESİ ---
   void _showBookingModal(
     List<dynamic> days,
     List<dynamic> hours,
@@ -35,10 +35,12 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
   ) {
     List<String> selectedDays = [];
     List<String> selectedHours = [];
+    String selectedType = 'Online'; // YENİ: Varsayılan ders tipi
     bool isSubmitting = false;
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFF1E1E1E),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -49,157 +51,193 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
             return SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[700],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      "Ders Talebi Oluştur",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // GÜN SEÇİMİ (Çoklu)
-                    Text(
-                      "Gün Seçin (Birden fazla seçebilirsiniz)",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: days.map((day) {
-                        final isSelected = selectedDays.contains(
-                          day.toString(),
-                        );
-                        return ChoiceChip(
-                          label: Text(day.toString()),
-                          selected: isSelected,
-                          selectedColor: ColorConstants.primaryColor,
-                          backgroundColor: Colors.white10,
-                          onSelected: (val) {
-                            setModalState(() {
-                              if (val)
-                                selectedDays.add(day.toString());
-                              else
-                                selectedDays.remove(day.toString());
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // SAAT SEÇİMİ (Çoklu)
-                    Text(
-                      "Saat Seçin (Birden fazla seçebilirsiniz)",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: hours.map((hour) {
-                        final isSelected = selectedHours.contains(
-                          hour.toString(),
-                        );
-                        return ChoiceChip(
-                          label: Text(hour.toString()),
-                          selected: isSelected,
-                          selectedColor: ColorConstants.primaryColor,
-                          backgroundColor: Colors.white10,
-                          onSelected: (val) {
-                            setModalState(() {
-                              if (val)
-                                selectedHours.add(hour.toString());
-                              else
-                                selectedHours.remove(hour.toString());
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 30),
-
-                    // ONAY BUTONU
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed:
-                            (selectedDays.isEmpty ||
-                                selectedHours.isEmpty ||
-                                isSubmitting)
-                            ? null
-                            : () async {
-                                setModalState(() => isSubmitting = true);
-                                await _submitLessonRequest(
-                                  selectedDays,
-                                  selectedHours,
-                                  lessonSport,
-                                  price,
-                                );
-                                if (mounted) {
-                                  Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        "Ders talebi eğitmenine iletildi!",
-                                        style: GoogleFonts.poppins(),
-                                      ),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ColorConstants.primaryColor,
-                          disabledBackgroundColor: Colors.white10,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[700],
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        child: isSubmitting
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.black,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                "Talebi Gönder",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+                      Text(
+                        "Ders Talebi Oluştur",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // YENİ: DERS TİPİ SEÇİMİ
+                      Text(
+                        "Ders Tipi",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: ['Online', 'Yüzyüze'].map((type) {
+                          final isSelected = selectedType == type;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: Text(type),
+                              selected: isSelected,
+                              selectedColor: ColorConstants.primaryColor,
+                              backgroundColor: Colors.white10,
+                              labelStyle: GoogleFonts.poppins(
+                                color: isSelected ? Colors.black : Colors.white,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                              onSelected: (val) {
+                                if (val) {
+                                  setModalState(() => selectedType = type);
+                                }
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Text(
+                        "Gün Seçin (Birden fazla seçebilirsiniz)",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: days.map((day) {
+                          final isSelected = selectedDays.contains(
+                            day.toString(),
+                          );
+                          return ChoiceChip(
+                            label: Text(day.toString()),
+                            selected: isSelected,
+                            selectedColor: ColorConstants.primaryColor,
+                            backgroundColor: Colors.white10,
+                            onSelected: (val) {
+                              setModalState(() {
+                                if (val) {
+                                  selectedDays.add(day.toString());
+                                } else {
+                                  selectedDays.remove(day.toString());
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Saat Seçin (Birden fazla seçebilirsiniz)",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: hours.map((hour) {
+                          final isSelected = selectedHours.contains(
+                            hour.toString(),
+                          );
+                          return ChoiceChip(
+                            label: Text(hour.toString()),
+                            selected: isSelected,
+                            selectedColor: ColorConstants.primaryColor,
+                            backgroundColor: Colors.white10,
+                            onSelected: (val) {
+                              setModalState(() {
+                                if (val) {
+                                  selectedHours.add(hour.toString());
+                                } else {
+                                  selectedHours.remove(hour.toString());
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 30),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed:
+                              (selectedDays.isEmpty ||
+                                  selectedHours.isEmpty ||
+                                  isSubmitting)
+                              ? null
+                              : () async {
+                                  setModalState(() => isSubmitting = true);
+                                  await _submitLessonRequest(
+                                    selectedDays,
+                                    selectedHours,
+                                    lessonSport,
+                                    price,
+                                    selectedType,
+                                  ); // Tipi de yolluyoruz
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          "Ders talebi eğitmenine iletildi!",
+                                          style: GoogleFonts.poppins(),
+                                        ),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ColorConstants.primaryColor,
+                            disabledBackgroundColor: Colors.white10,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: isSubmitting
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.black,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  "Talebi Gönder",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -214,6 +252,7 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
     List<String> selectedHours,
     String sport,
     int price,
+    String lessonType,
   ) async {
     final currentUser = _auth.currentUser!;
     final myDoc = await _firestore
@@ -224,7 +263,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
         "${myDoc.data()?['name'] ?? ''} ${myDoc.data()?['surname'] ?? ''}"
             .trim();
     final String? myImage = myDoc.data()?['profileImageUrl'];
-
     final String coachFullName =
         "${widget.coachData['name'] ?? ''} ${widget.coachData['surname'] ?? ''}"
             .trim();
@@ -241,179 +279,8 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
       'hours': selectedHours,
       'price': price,
       'status': 'pending',
+      'lessonType': lessonType, // YENİ: Veritabanına kaydedildi
       'timestamp': FieldValue.serverTimestamp(),
-    });
-  }
-
-  // --- YORUM PENCERELERİ ---
-  void _showAddReviewModal() {
-    int selectedStar = 5;
-    TextEditingController commentController = TextEditingController();
-    bool isSubmitting = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[700],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    "Eğitmeni Değerlendir",
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return IconButton(
-                        icon: Icon(
-                          index < selectedStar
-                              ? Icons.star_rounded
-                              : Icons.star_border_rounded,
-                          color: Colors.amber,
-                          size: 40,
-                        ),
-                        onPressed: () =>
-                            setModalState(() => selectedStar = index + 1),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: commentController,
-                    maxLines: 4,
-                    style: GoogleFonts.poppins(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: "Eğitmen hakkında ne düşünüyorsun?",
-                      hintStyle: GoogleFonts.poppins(color: Colors.white30),
-                      filled: true,
-                      fillColor: Colors.black26,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: isSubmitting
-                          ? null
-                          : () async {
-                              if (commentController.text.trim().isEmpty) return;
-                              setModalState(() => isSubmitting = true);
-                              await _submitReview(
-                                selectedStar,
-                                commentController.text.trim(),
-                              );
-                              if (mounted) Navigator.pop(context);
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ColorConstants.primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: isSubmitting
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.black,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              "Yorumu Gönder",
-                              style: GoogleFonts.poppins(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _submitReview(int rating, String comment) async {
-    final currentUser = _auth.currentUser!;
-    final myDoc = await _firestore
-        .collection('users')
-        .doc(currentUser.uid)
-        .get();
-    final String myName =
-        "${myDoc.data()?['name'] ?? ''} ${myDoc.data()?['surname'] ?? ''}"
-            .trim();
-    final String? myImage = myDoc.data()?['profileImageUrl'];
-
-    await _firestore
-        .collection('users')
-        .doc(coachUid)
-        .collection('reviews')
-        .doc(currentUser.uid)
-        .set({
-          'userId': currentUser.uid,
-          'userName': myName.isEmpty ? "Öğrenci" : myName,
-          'userImage': myImage,
-          'rating': rating,
-          'comment': comment,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-
-    final reviewsSnapshot = await _firestore
-        .collection('users')
-        .doc(coachUid)
-        .collection('reviews')
-        .get();
-    double totalScore = 0;
-    for (var doc in reviewsSnapshot.docs) {
-      totalScore += (doc.data()['rating'] ?? 0);
-    }
-    double newAverage = totalScore / reviewsSnapshot.docs.length;
-
-    await _firestore.collection('users').doc(coachUid).update({
-      'rating': newAverage,
-      'reviewCount': reviewsSnapshot.docs.length,
     });
   }
 
@@ -464,20 +331,21 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         .orderBy('timestamp', descending: true)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting)
+                      if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
                           child: CircularProgressIndicator(
                             color: ColorConstants.primaryColor,
                           ),
                         );
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                      }
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                         return Center(
                           child: Text(
                             "Henüz yorum yapılmamış.",
                             style: GoogleFonts.poppins(color: Colors.white54),
                           ),
                         );
-
+                      }
                       return ListView.builder(
                         controller: scrollController,
                         padding: const EdgeInsets.symmetric(
@@ -586,7 +454,8 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
     final String lessonSport = widget.coachData['lessonSport'] ?? "Genel";
     final String character =
         widget.coachData['coachCharacter'] ?? "Belirtilmemiş";
-    final String deliveryMode = widget.coachData['deliveryMode'] ?? "Online";
+    final String deliveryMode =
+        widget.coachData['deliveryMode'] ?? "Online/Yüzyüze";
     final int price = widget.coachData['hourlyRate'] ?? 0;
     final List<dynamic> specialties = widget.coachData['specialties'] ?? [];
     final List<dynamic> days = widget.coachData['availableDays'] ?? [];
@@ -680,7 +549,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                 ),
               ],
             ),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
@@ -736,14 +604,12 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // YENİ BUTON DÜZENİ (DÜZELTİLEN KISIM)
                   Row(
                     children: [
-                      // 1. MESAJ GÖNDER BUTONU
                       Expanded(
                         child: ScaleButton(
                           onPressed: () {
-                            if (coachUid.isNotEmpty)
+                            if (coachUid.isNotEmpty) {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -753,6 +619,7 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                   ),
                                 ),
                               );
+                            }
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -783,8 +650,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-
-                      // 2. DERSİ AL / DERS ALINDI KISMI (DİNAMİK)
                       StreamBuilder<QuerySnapshot>(
                         stream: _firestore
                             .collection('lessons')
@@ -796,7 +661,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                             .snapshots(),
                         builder: (context, snapshot) {
                           bool isBooked = false;
-
                           if (snapshot.hasData) {
                             isBooked = snapshot.data!.docs.any(
                               (doc) =>
@@ -804,9 +668,7 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                   doc['status'] == 'approved',
                             );
                           }
-
                           if (isBooked) {
-                            // ALINDI DURUMU: Statik yeşil kutu (Tıklanamaz)
                             return Expanded(
                               flex: 2,
                               child: Container(
@@ -847,7 +709,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                               ),
                             );
                           } else {
-                            // ALINMADI DURUMU: Normal Dersi Al Butonu
                             return Expanded(
                               flex: 2,
                               child: ScaleButton(
@@ -897,7 +758,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // UZUN ÖN GÖRÜŞME BUTONU
                   ScaleButton(
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -940,7 +800,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // PUAN KISMI
                   StreamBuilder<DocumentSnapshot>(
                     stream: _firestore
                         .collection('users')
@@ -991,15 +850,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                     fontSize: 13,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                IconButton(
-                                  onPressed: _showAddReviewModal,
-                                  icon: const Icon(
-                                    Icons.edit_square,
-                                    color: ColorConstants.primaryColor,
-                                    size: 20,
-                                  ),
-                                ),
                               ],
                             ),
                             TextButton(
@@ -1022,8 +872,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                     },
                   ),
                   const SizedBox(height: 24),
-
-                  // DETAYLAR
                   Text(
                     "Hakkında",
                     style: GoogleFonts.poppins(
@@ -1095,7 +943,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-
                   if (specialties.isNotEmpty) ...[
                     Text(
                       "Tüm Uzmanlık Alanları",

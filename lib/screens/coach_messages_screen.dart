@@ -107,8 +107,9 @@ class _CoachMessagesScreenState extends State<CoachMessagesScreen> {
                 orElse: () => '',
               );
 
-              if (otherUserId.isEmpty)
+              if (otherUserId.isEmpty) {
                 return const SizedBox(); // Karşı taraf yoksa atla
+              }
 
               String lastMessage =
                   roomData['lastMessage'] ?? 'Mesaj gönderildi';

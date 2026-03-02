@@ -6,7 +6,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../core/constants/color_constants.dart';
+import '../widgets/scale_button.dart';
 import 'chat_screen.dart';
+import 'video_call_screen.dart';
 
 class CoachCalendarScreen extends StatefulWidget {
   const CoachCalendarScreen({super.key});
@@ -27,7 +29,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
     _selectedDay = _focusedDay;
   }
 
-  // Takvimin (DateTime) verdiği gün numarasını Türkçe gün ismine çevirir
   String _getWeekdayString(int weekday) {
     switch (weekday) {
       case 1:
@@ -49,29 +50,26 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
     }
   }
 
-  // O gün için onaylanmış dersleri filtreler
   List<Map<String, dynamic>> _getLessonsForDay(
     DateTime day,
     List<QueryDocumentSnapshot> allLessons,
   ) {
     String dayName = _getWeekdayString(day.weekday);
     List<Map<String, dynamic>> dayLessons = [];
-
     for (var doc in allLessons) {
       var data = doc.data() as Map<String, dynamic>;
       List<dynamic> days = data['days'] ?? [];
-      // Eğer dersin günleri arasında bu gün (Örn: Pazartesi) varsa listeye ekle
-      if (days.contains(dayName)) {
-        dayLessons.add(data);
-      }
+      if (days.contains(dayName)) dayLessons.add(data);
     }
     return dayLessons;
   }
 
-  // --- ALTTAN AÇILAN ÖĞRENCİ DETAY PANELİ ---
   void _showLessonDetails(Map<String, dynamic> lesson) {
+    String type = lesson['lessonType'] ?? 'Online'; // YENİ EKLENDİ
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFF1E1E1E),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -80,117 +78,206 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[700],
-                      borderRadius: BorderRadius.circular(2),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[700],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  "Ders Detayı",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(height: 24),
+                  Text(
+                    "Ders Detayı",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-                // Öğrenci Kartı
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white10),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: Colors.white10,
+                          backgroundImage: lesson['athleteImage'] != null
+                              ? NetworkImage(lesson['athleteImage'])
+                              : null,
+                          child: lesson['athleteImage'] == null
+                              ? const Icon(Icons.person, color: Colors.white54)
+                              : null,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                lesson['athleteName'],
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                "Öğrenci",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(
+                                  receiverId: lesson['athleteId'],
+                                  receiverName: lesson['athleteName'],
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.chat_bubble_outline_rounded,
+                            color: ColorConstants.primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
+                  const SizedBox(height: 16),
+                  Row(
                     children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: Colors.white10,
-                        backgroundImage: lesson['athleteImage'] != null
-                            ? NetworkImage(lesson['athleteImage'])
-                            : null,
-                        child: lesson['athleteImage'] == null
-                            ? const Icon(Icons.person, color: Colors.white54)
-                            : null,
+                      Expanded(
+                        child: _buildInfoCard(
+                          Icons.access_time_rounded,
+                          "Saatler",
+                          (lesson['hours'] as List).join('\n'),
+                        ),
                       ),
                       const SizedBox(width: 16),
+                      // YENİ: Branş kartının altına ders tipini de ekledik
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              lesson['athleteName'],
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                        child: _buildInfoCard(
+                          Icons.sports_gymnastics_rounded,
+                          "Branş / Tip",
+                          "${lesson['sport']}\n$type",
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // YENİ: SADECE ONLINE DERSLERDE BAŞLAT BUTONU ÇIKAR
+                  if (type == 'Online') ...[
+                    ScaleButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VideoCallScreen(
+                              roomName: "${lesson['sport']} Dersi",
+                              remoteUserName:
+                                  lesson['athleteName'] ?? "Öğrenci",
                             ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: ColorConstants.primaryColor,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.play_circle_fill_rounded,
+                              color: Colors.black,
+                            ),
+                            const SizedBox(width: 8),
                             Text(
-                              "Öğrenci",
+                              "Dersi Başlat",
                               style: GoogleFonts.poppins(
-                                color: Colors.white54,
-                                fontSize: 12,
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      IconButton(
-                        onPressed: () {
-                          Navigator.pop(context); // Paneli kapat
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ChatScreen(
-                                receiverId: lesson['athleteId'],
-                                receiverName: lesson['athleteName'],
-                              ),
-                            ),
-                          ); // Mesaja git
-                        },
-                        icon: const Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          color: ColorConstants.primaryColor,
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Text(
+                        "Oda ders saatinden 10 dk önce açılır.",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white30,
+                          fontSize: 11,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildInfoCard(
-                        Icons.access_time_rounded,
-                        "Saatler",
-                        (lesson['hours'] as List).join('\n'),
-                      ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildInfoCard(
-                        Icons.sports_gymnastics_rounded,
-                        "Branş",
-                        lesson['sport'],
+                  ] else ...[
+                    // YÜZYÜZE İSE BİLGİ VER
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                        horizontal: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.directions_run_rounded,
+                            color: Colors.white54,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Yüzyüze Antrenman",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white54,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 24),
-              ],
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         );
@@ -251,28 +338,24 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
           ),
         ),
       ),
-
-      // VERİTABANINDAN SADECE ONAYLANAN DERSLERİ ÇEKİYORUZ
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('lessons')
             .where('coachId', isEqualTo: _auth.currentUser!.uid)
-            .where('status', isEqualTo: 'approved') // Sadece onaylı dersler
+            .where('status', isEqualTo: 'approved')
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
               child: CircularProgressIndicator(
                 color: ColorConstants.primaryColor,
               ),
             );
-
+          }
           List<QueryDocumentSnapshot> approvedLessons =
               snapshot.data?.docs ?? [];
-
           return Column(
             children: [
-              // TAKVİM KISMI
               Container(
                 margin: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -292,7 +375,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                       _focusedDay = focusedDay;
                     });
                   },
-                  // Noktaları (Marker) koymak için veriyi süzüyoruz
                   eventLoader: (day) => _getLessonsForDay(day, approvedLessons),
                   startingDayOfWeek: StartingDayOfWeek.monday,
                   calendarStyle: CalendarStyle(
@@ -345,7 +427,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 10),
               if (_selectedDay != null)
                 Padding(
@@ -374,8 +455,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                     ],
                   ),
                 ),
-
-              // SEÇİLEN GÜNÜN DERSLERİ
               Expanded(
                 child: _selectedDay == null
                     ? Center(
@@ -398,7 +477,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
     List<QueryDocumentSnapshot> allLessons,
   ) {
     final lessons = _getLessonsForDay(day, allLessons);
-
     if (lessons.isEmpty) {
       return Center(
         child: Column(
@@ -418,7 +496,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
         ),
       );
     }
-
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: lessons.length,

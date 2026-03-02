@@ -60,5 +60,9 @@
 		</dict>
 	</array>
 	</dict> </plist>
+<key>NSCameraUsageDescription</key>
+	<string>Canlı antrenman dersleri için kameranıza erişmemiz gerekiyor.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Canlı derslerde eğitmenle konuşabilmeniz için mikrofonunuza erişmemiz gerekiyor.</string>
 </dict>
 </plist>
