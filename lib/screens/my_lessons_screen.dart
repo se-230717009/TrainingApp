@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/scale_button.dart';
 import 'video_call_screen.dart';
+import '../widgets/gradient_background.dart';
 
 class MyLessonsScreen extends StatefulWidget {
   const MyLessonsScreen({super.key});
@@ -208,284 +209,289 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
+    return GradientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context),
           ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          "Derslerim",
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+          title: Text(
+            "Derslerim",
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _firestore
-            .collection('lessons')
-            .where('athleteId', isEqualTo: _auth.currentUser!.uid)
-            .orderBy('timestamp', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
-            return const Center(
-              child: CircularProgressIndicator(
-                color: ColorConstants.primaryColor,
-              ),
-            );
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
-            return _buildEmptyState(context);
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: snapshot.data!.docs.length,
-            itemBuilder: (context, index) {
-              var lesson =
-                  snapshot.data!.docs[index].data() as Map<String, dynamic>;
-              String status = lesson['status'] ?? 'pending';
-              String type = lesson['lessonType'] ?? 'Online'; // YENİ: DERS TİPİ
-
-              Color statusColor = Colors.orange;
-              String statusText = "Onay Bekliyor";
-              IconData statusIcon = Icons.hourglass_empty_rounded;
-              if (status == 'approved') {
-                statusColor = Colors.green;
-                statusText = "Aktif Ders";
-                statusIcon = Icons.check_circle_rounded;
-              } else if (status == 'rejected') {
-                statusColor = Colors.redAccent;
-                statusText = "Reddedildi";
-                statusIcon = Icons.cancel_rounded;
-              }
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: status == 'approved'
-                        ? ColorConstants.primaryColor.withOpacity(0.3)
-                        : Colors.white10,
-                  ),
+        body: StreamBuilder<QuerySnapshot>(
+          stream: _firestore
+              .collection('lessons')
+              .where('athleteId', isEqualTo: _auth.currentUser!.uid)
+              .orderBy('timestamp', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting)
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: ColorConstants.primaryColor,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Colors.white10,
-                          backgroundImage: lesson['coachImage'] != null
-                              ? NetworkImage(lesson['coachImage'])
-                              : null,
-                          child: lesson['coachImage'] == null
-                              ? const Icon(Icons.person, color: Colors.white54)
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                lesson['coachName'] ?? 'Eğitmen',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              // YENİ: Sporun yanına Online / Yüzyüze etiketi eklendi
-                              Text(
-                                "${lesson['sport']} • $type",
-                                style: GoogleFonts.poppins(
-                                  color: ColorConstants.primaryColor,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(statusIcon, color: statusColor, size: 14),
-                              const SizedBox(width: 4),
-                              Text(
-                                statusText,
-                                style: GoogleFonts.poppins(
-                                  color: statusColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.calendar_today_rounded,
-                          color: Colors.white54,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            (lesson['days'] ?? []).join(', '),
-                            style: GoogleFonts.poppins(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.access_time_rounded,
-                          color: Colors.white54,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            (lesson['hours'] ?? []).join(', '),
-                            style: GoogleFonts.poppins(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+              );
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+              return _buildEmptyState(context);
 
-                    // YENİ: EĞER DERS ONAYLIYSA VE TİPİ ONLINE İSE KAMERA BUTONUNU GÖSTER
-                    if (status == 'approved' && type == 'Online') ...[
-                      const SizedBox(height: 16),
-                      ScaleButton(
-                        onPressed: () async {
-                          final bool? isClassEnded = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => VideoCallScreen(
-                                roomName: "${lesson['sport']} Dersi",
-                                remoteUserName:
-                                    lesson['coachName'] ?? "Eğitmen",
-                              ),
-                            ),
-                          );
-                          if (isClassEnded == true) {
-                            _showAddReviewModal(lesson['coachId']);
-                          }
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                ColorConstants.primaryColor,
-                                Color(0xFFB4FF4E),
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: snapshot.data!.docs.length,
+              itemBuilder: (context, index) {
+                var lesson =
+                    snapshot.data!.docs[index].data() as Map<String, dynamic>;
+                String status = lesson['status'] ?? 'pending';
+                String type =
+                    lesson['lessonType'] ?? 'Online'; // YENİ: DERS TİPİ
+
+                Color statusColor = Colors.orange;
+                String statusText = "Onay Bekliyor";
+                IconData statusIcon = Icons.hourglass_empty_rounded;
+                if (status == 'approved') {
+                  statusColor = Colors.green;
+                  statusText = "Aktif Ders";
+                  statusIcon = Icons.check_circle_rounded;
+                } else if (status == 'rejected') {
+                  statusColor = Colors.redAccent;
+                  statusText = "Reddedildi";
+                  statusIcon = Icons.cancel_rounded;
+                }
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: status == 'approved'
+                          ? ColorConstants.primaryColor.withOpacity(0.3)
+                          : Colors.white10,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 24,
+                            backgroundColor: Colors.white10,
+                            backgroundImage: lesson['coachImage'] != null
+                                ? NetworkImage(lesson['coachImage'])
+                                : null,
+                            child: lesson['coachImage'] == null
+                                ? const Icon(
+                                    Icons.person,
+                                    color: Colors.white54,
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  lesson['coachName'] ?? 'Eğitmen',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                // YENİ: Sporun yanına Online / Yüzyüze etiketi eklendi
+                                Text(
+                                  "${lesson['sport']} • $type",
+                                  style: GoogleFonts.poppins(
+                                    color: ColorConstants.primaryColor,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: ColorConstants.primaryColor.withOpacity(
-                                  0.3,
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(statusIcon, color: statusColor, size: 14),
+                                const SizedBox(width: 4),
+                                Text(
+                                  statusText,
+                                  style: GoogleFonts.poppins(
+                                    color: statusColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                                blurRadius: 10,
-                                spreadRadius: 1,
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.calendar_today_rounded,
+                            color: Colors.white54,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              (lesson['days'] ?? []).join(', '),
+                              style: GoogleFonts.poppins(
+                                color: Colors.white70,
+                                fontSize: 13,
                               ),
-                            ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.access_time_rounded,
+                            color: Colors.white54,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              (lesson['hours'] ?? []).join(', '),
+                              style: GoogleFonts.poppins(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // YENİ: EĞER DERS ONAYLIYSA VE TİPİ ONLINE İSE KAMERA BUTONUNU GÖSTER
+                      if (status == 'approved' && type == 'Online') ...[
+                        const SizedBox(height: 16),
+                        ScaleButton(
+                          onPressed: () async {
+                            final bool? isClassEnded = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => VideoCallScreen(
+                                  roomName: "${lesson['sport']} Dersi",
+                                  remoteUserName:
+                                      lesson['coachName'] ?? "Eğitmen",
+                                ),
+                              ),
+                            );
+                            if (isClassEnded == true) {
+                              _showAddReviewModal(lesson['coachId']);
+                            }
+                          },
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  ColorConstants.primaryColor,
+                                  Color(0xFFB4FF4E),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: ColorConstants.primaryColor
+                                      .withOpacity(0.3),
+                                  blurRadius: 10,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.videocam_rounded,
+                                  color: Colors.black,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Canlı Derse Katıl",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else if (status == 'approved' && type == 'Yüzyüze') ...[
+                        // YÜZYÜZE İSE KAMERA YERİNE BİLGİ VER
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                            horizontal: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Icon(
-                                Icons.videocam_rounded,
-                                color: Colors.black,
+                                Icons.location_on_rounded,
+                                color: Colors.white54,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                "Canlı Derse Katıl",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
+                              Expanded(
+                                child: Text(
+                                  "Yüzyüze Ders - Konum ve detaylar için mesaj atabilirsiniz.",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white54,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ] else if (status == 'approved' && type == 'Yüzyüze') ...[
-                      // YÜZYÜZE İSE KAMERA YERİNE BİLGİ VER
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on_rounded,
-                              color: Colors.white54,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                "Yüzyüze Ders - Konum ve detaylar için mesaj atabilirsiniz.",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white54,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      ],
                     ],
-                  ],
-                ),
-              );
-            },
-          );
-        },
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

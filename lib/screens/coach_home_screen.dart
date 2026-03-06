@@ -105,13 +105,23 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
       // --- ÜST BAR ---
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.black.withOpacity(0.6),
         elevation: 0,
         automaticallyImplyLeading: false,
         centerTitle: false,
         titleSpacing: 24,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A1A1A), Colors.transparent],
+            ),
+          ),
+        ),
         title: PopupMenuButton<String>(
           color: const Color(0xFF1E1E1E),
           shape: RoundedRectangleBorder(

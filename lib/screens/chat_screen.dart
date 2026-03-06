@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/color_constants.dart';
 import '../services/chat_service.dart';
+import '../widgets/gradient_background.dart';
 
 class ChatScreen extends StatefulWidget {
   final String receiverId;
@@ -36,66 +37,68 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
+    return GradientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1E1E1E),
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context),
           ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          widget.receiverName,
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          // MESAJ LİSTESİ (ANLIK DİNLENİYOR)
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _chatService.getMessages(
-                _auth.currentUser!.uid,
-                widget.receiverId,
-              ),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      "Hata oluştu",
-                      style: GoogleFonts.poppins(color: Colors.white),
-                    ),
-                  );
-                }
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: ColorConstants.primaryColor,
-                    ),
-                  );
-                }
-
-                return ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: snapshot.data!.docs
-                      .map((document) => _buildMessageItem(document))
-                      .toList(),
-                );
-              },
+          title: Text(
+            widget.receiverName,
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
           ),
+        ),
+        body: Column(
+          children: [
+            // MESAJ LİSTESİ (ANLIK DİNLENİYOR)
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _chatService.getMessages(
+                  _auth.currentUser!.uid,
+                  widget.receiverId,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        "Hata oluştu",
+                        style: GoogleFonts.poppins(color: Colors.white),
+                      ),
+                    );
+                  }
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: ColorConstants.primaryColor,
+                      ),
+                    );
+                  }
 
-          // MESAJ GÖNDERME KUTUSU
-          _buildMessageInput(),
-        ],
+                  return ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: snapshot.data!.docs
+                        .map((document) => _buildMessageItem(document))
+                        .toList(),
+                  );
+                },
+              ),
+            ),
+
+            // MESAJ GÖNDERME KUTUSU
+            _buildMessageInput(),
+          ],
+        ),
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/gradient_background.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -209,208 +210,210 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
+    return GradientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context),
           ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          "Profili Düzenle",
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+          title: Text(
+            "Profili Düzenle",
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: ColorConstants.primaryColor,
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // --- FOTOĞRAF ALANI ---
-                  Center(
-                    child: Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        CircleAvatar(
-                          radius: 60,
-                          backgroundColor: Colors.white10,
-                          backgroundImage: _selectedImage != null
-                              ? FileImage(_selectedImage!) as ImageProvider
-                              : (_profileImageUrl != null
-                                    ? NetworkImage(_profileImageUrl!)
-                                    : null),
-                          child:
-                              (_selectedImage == null &&
-                                  _profileImageUrl == null)
-                              ? const Icon(
-                                  Icons.person,
-                                  size: 60,
-                                  color: Colors.white38,
-                                )
-                              : null,
-                        ),
-                        GestureDetector(
-                          onTap: _pickImage,
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: const BoxDecoration(
-                              color: ColorConstants.primaryColor,
-                              shape: BoxShape.circle,
+        body: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: ColorConstants.primaryColor,
+                ),
+              )
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- FOTOĞRAF ALANI ---
+                    Center(
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 60,
+                            backgroundColor: Colors.white10,
+                            backgroundImage: _selectedImage != null
+                                ? FileImage(_selectedImage!) as ImageProvider
+                                : (_profileImageUrl != null
+                                      ? NetworkImage(_profileImageUrl!)
+                                      : null),
+                            child:
+                                (_selectedImage == null &&
+                                    _profileImageUrl == null)
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 60,
+                                    color: Colors.white38,
+                                  )
+                                : null,
+                          ),
+                          GestureDetector(
+                            onTap: _pickImage,
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: const BoxDecoration(
+                                color: ColorConstants.primaryColor,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.camera_alt_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // --- ORTAK BİLGİLER ---
-                  _buildTextField("Ad", _nameController),
-                  const SizedBox(height: 16),
-                  _buildTextField("Soyad", _surnameController),
-                  const SizedBox(height: 16),
-
-                  // --- SPORCU BİLGİLERİ ---
-                  if (_userType == 'athlete') ...[
-                    // Fiziksel Özellikler
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            "Yaş",
-                            _ageController,
-                            isNumber: true,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            "Boy (cm)",
-                            _heightController,
-                            isNumber: true,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            "Kilo",
-                            _weightController,
-                            isNumber: true,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Hedef ve Seviye Seçimi (Dropdown)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildDropdown(
-                            "Spor Seviyesi",
-                            _levelList,
-                            _selectedLevel,
-                            (val) => setState(() => _selectedLevel = val),
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        Expanded(
-                          child: _buildDropdown(
-                            "Ana Hedef",
-                            _goalList,
-                            _selectedGoal,
-                            (val) => setState(() => _selectedGoal = val),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 30),
-
-                    // İlgilendiği Sporlar (Çoklu Seçim / ChoiceChip)
-                    Text(
-                      "İlgilendiğin Sporlar",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white54,
-                        fontSize: 14,
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _sportsList.map((sport) {
-                        final isSelected = _selectedSports.contains(sport);
-                        return ChoiceChip(
-                          label: Text(sport),
-                          labelStyle: GoogleFonts.poppins(
-                            color: isSelected
-                                ? Colors.black
-                                : const Color.fromARGB(179, 2, 2, 2),
-                            fontWeight: FontWeight.w600,
-                          ),
-                          selected: isSelected,
-                          selectedColor: ColorConstants.primaryColor,
-                          backgroundColor: Colors.white10,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          side: BorderSide.none,
-                          onSelected: (selected) {
-                            setState(() {
-                              selected
-                                  ? _selectedSports.add(sport)
-                                  : _selectedSports.remove(sport);
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ],
+                    const SizedBox(height: 32),
 
-                  // --- ANTRENÖR BİLGİLERİ ---
-                  if (_userType == 'coach') ...[
-                    _buildTextField(
-                      "Hakkımda (Bio)",
-                      _bioController,
-                      maxLines: 4,
-                    ),
-                  ],
+                    // --- ORTAK BİLGİLER ---
+                    _buildTextField("Ad", _nameController),
+                    const SizedBox(height: 16),
+                    _buildTextField("Soyad", _surnameController),
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 40),
-
-                  // --- KAYDET BUTONU ---
-                  _isSaving
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: ColorConstants.primaryColor,
+                    // --- SPORCU BİLGİLERİ ---
+                    if (_userType == 'athlete') ...[
+                      // Fiziksel Özellikler
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              "Yaş",
+                              _ageController,
+                              isNumber: true,
+                            ),
                           ),
-                        )
-                      : CustomButton(
-                          text: "Değişiklikleri Kaydet",
-                          onPressed: _saveProfile,
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField(
+                              "Boy (cm)",
+                              _heightController,
+                              isNumber: true,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildTextField(
+                              "Kilo",
+                              _weightController,
+                              isNumber: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Hedef ve Seviye Seçimi (Dropdown)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDropdown(
+                              "Spor Seviyesi",
+                              _levelList,
+                              _selectedLevel,
+                              (val) => setState(() => _selectedLevel = val),
+                            ),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: _buildDropdown(
+                              "Ana Hedef",
+                              _goalList,
+                              _selectedGoal,
+                              (val) => setState(() => _selectedGoal = val),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+
+                      // İlgilendiği Sporlar (Çoklu Seçim / ChoiceChip)
+                      Text(
+                        "İlgilendiğin Sporlar",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white54,
+                          fontSize: 14,
                         ),
-                ],
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _sportsList.map((sport) {
+                          final isSelected = _selectedSports.contains(sport);
+                          return ChoiceChip(
+                            label: Text(sport),
+                            labelStyle: GoogleFonts.poppins(
+                              color: isSelected
+                                  ? Colors.black
+                                  : const Color.fromARGB(179, 2, 2, 2),
+                              fontWeight: FontWeight.w600,
+                            ),
+                            selected: isSelected,
+                            selectedColor: ColorConstants.primaryColor,
+                            backgroundColor: Colors.white10,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            side: BorderSide.none,
+                            onSelected: (selected) {
+                              setState(() {
+                                selected
+                                    ? _selectedSports.add(sport)
+                                    : _selectedSports.remove(sport);
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+
+                    // --- ANTRENÖR BİLGİLERİ ---
+                    if (_userType == 'coach') ...[
+                      _buildTextField(
+                        "Hakkımda (Bio)",
+                        _bioController,
+                        maxLines: 4,
+                      ),
+                    ],
+
+                    const SizedBox(height: 40),
+
+                    // --- KAYDET BUTONU ---
+                    _isSaving
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: ColorConstants.primaryColor,
+                            ),
+                          )
+                        : CustomButton(
+                            text: "Değişiklikleri Kaydet",
+                            onPressed: _saveProfile,
+                          ),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
