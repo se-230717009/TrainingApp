@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:file_picker/file_picker.dart';
@@ -36,6 +38,20 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   String? _coachCharacter;
   String? _deliveryMode;
 
+  // --- API KONUM DEĞİŞKENLERİ ---
+  String? _selectedCity;
+  String? _selectedDistrict;
+  String? _selectedNeighborhood;
+
+  List<dynamic> _citiesData = [];
+  List<dynamic> _districtsData = [];
+  List<dynamic> _neighborhoodsData = [];
+  bool _isLoadingLocation = false;
+
+  final TextEditingController _addressDetailController =
+      TextEditingController();
+  final TextEditingController _addressTitleController = TextEditingController();
+
   final List<String> _specialties = [
     "Fitness",
     "Pilates",
@@ -65,8 +81,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     "18:00 - 21:00",
     "21:00 - 00:00",
   ];
-
-  // ÖĞRENCİ HEDEFLERİYLE EŞLEŞECEK 5 KARAKTER
   final List<String> _characterList = [
     "Motivatör & Enerjik",
     "Disiplinli & Güç Odaklı",
@@ -74,6 +88,114 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     "Sakin & Beden Farkındalığı",
     "Sert & Hedef Odaklı (Pro)",
   ];
+
+  bool get _needsLocation =>
+      _deliveryMode == "Yüzyüze" || _deliveryMode == "Hibrit(İkisi de)";
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCities();
+  }
+
+  // --- API: İLLERİ ÇEK ---
+  Future<void> _fetchCities() async {
+    setState(() => _isLoadingLocation = true);
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.turkiyeapi.dev/v1/provinces?limit=100'),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        setState(() {
+          _citiesData = data['data'];
+          _citiesData.sort(
+            (a, b) => a['name'].toString().compareTo(b['name'].toString()),
+          );
+        });
+      }
+    } catch (e) {
+      _showError("İller yüklenirken hata oluştu.");
+    } finally {
+      setState(() => _isLoadingLocation = false);
+    }
+  }
+
+  // --- API: İLÇELERİ ÇEK ---
+  Future<void> _fetchDistricts(int provinceId) async {
+    setState(() {
+      _isLoadingLocation = true;
+      _districtsData = [];
+      _neighborhoodsData = [];
+      _selectedDistrict = null;
+      _selectedNeighborhood = null;
+    });
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://api.turkiyeapi.dev/v1/districts?provinceId=$provinceId&limit=1000',
+        ),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        setState(() {
+          _districtsData = data['data'];
+          _districtsData.sort(
+            (a, b) => a['name'].toString().compareTo(b['name'].toString()),
+          );
+        });
+      }
+    } catch (e) {
+      _showError("İlçeler yüklenirken hata oluştu.");
+    } finally {
+      setState(() => _isLoadingLocation = false);
+    }
+  }
+
+  // --- API: MAHALLELERİ ÇEK ---
+  Future<void> _fetchNeighborhoods(int districtId) async {
+    setState(() {
+      _isLoadingLocation = true;
+      _neighborhoodsData = [];
+      _selectedNeighborhood = null;
+    });
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://api.turkiyeapi.dev/v1/neighborhoods?districtId=$districtId&limit=1000',
+        ),
+      );
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        setState(() {
+          _neighborhoodsData = data['data'];
+          _neighborhoodsData.sort(
+            (a, b) => a['name'].toString().compareTo(b['name'].toString()),
+          );
+        });
+      }
+    } catch (e) {
+      _showError("Mahalleler yüklenirken hata oluştu.");
+    } finally {
+      setState(() => _isLoadingLocation = false);
+    }
+  }
+
+  // --- DİNAMİK SAYFA LİSTESİ ---
+  List<Widget> get _pages {
+    List<Widget> p = [
+      _buildStep1Specialties(),
+      _buildStep2Bio(),
+      _buildStep3References(),
+      _buildStep4LessonSport(),
+    ];
+    if (_needsLocation) {
+      p.add(_buildStepLocation());
+    }
+    p.add(_buildStep5Availability());
+    p.add(_buildStep6Character());
+    return p;
+  }
 
   Future<void> _pickFile() async {
     try {
@@ -93,33 +215,49 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   }
 
   void _nextPage() {
-    if (_currentIndex == 0 && _selectedSpecialties.isEmpty) {
+    final int totalPages = _pages.length;
+
+    if (_currentIndex == 0 && _selectedSpecialties.isEmpty)
       return _showError("Lütfen en az bir uzmanlık alanı seçin.");
-    }
     if (_currentIndex == 1 &&
         (_bioController.text.trim().isEmpty ||
-            _bioController.text.trim().length < 20)) {
+            _bioController.text.trim().length < 20))
       return _showError("Bio en az 20 karakter olmalıdır.");
-    }
     if (_currentIndex == 2 &&
         _referenceController.text.trim().isEmpty &&
-        _selectedFile == null) {
+        _selectedFile == null)
       return _showError("Lütfen bir referans linki girin veya belge yükleyin.");
-    }
     if (_currentIndex == 3 &&
-        (_selectedLessonSport == null || _priceController.text.isEmpty)) {
-      return _showError("Lütfen branş,ders şekli ve ücret belirleyin.");
-    }
-    if (_currentIndex == 4 &&
-        (_selectedDays.isEmpty || _selectedHours.isEmpty)) {
-      return _showError("Lütfen en az bir gün ve saat aralığı seçin.");
-    }
-    if (_currentIndex == 5 && _coachCharacter == null) {
-      return _showError("Lütfen eğitmen karakterinizi seçin.");
+        (_selectedLessonSport == null ||
+            _priceController.text.isEmpty ||
+            _deliveryMode == null))
+      return _showError("Lütfen branş, ders şekli ve ücret belirleyin.");
+
+    if (_needsLocation) {
+      if (_currentIndex == 4 &&
+          (_selectedCity == null ||
+              _selectedDistrict == null ||
+              _selectedNeighborhood == null ||
+              _addressTitleController.text.isEmpty ||
+              _addressDetailController.text.isEmpty)) {
+        return _showError(
+          "Lütfen il, ilçe ve adres bilgilerini eksiksiz doldurun.",
+        );
+      }
+      if (_currentIndex == 5 &&
+          (_selectedDays.isEmpty || _selectedHours.isEmpty))
+        return _showError("Lütfen en az bir gün ve saat aralığı seçin.");
+      if (_currentIndex == 6 && _coachCharacter == null)
+        return _showError("Lütfen eğitmen karakterinizi seçin.");
+    } else {
+      if (_currentIndex == 4 &&
+          (_selectedDays.isEmpty || _selectedHours.isEmpty))
+        return _showError("Lütfen en az bir gün ve saat aralığı seçin.");
+      if (_currentIndex == 5 && _coachCharacter == null)
+        return _showError("Lütfen eğitmen karakterinizi seçin.");
     }
 
-    if (_currentIndex < 5) {
-      // 6 Adım oldu (0-5)
+    if (_currentIndex < totalPages - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
@@ -159,22 +297,31 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         referenceLinks.add(await storageRef.getDownloadURL());
       }
 
-      await _authService.updateUserProfile(
-        uid: uid,
-        data: {
-          'specialties': _selectedSpecialties,
-          'bio': _bioController.text.trim(),
-          'referenceLinks': referenceLinks,
-          'lessonSport': _selectedLessonSport,
-          'hourlyRate': int.tryParse(_priceController.text) ?? 0,
-          'availableDays': _selectedDays,
-          'availableHours': _selectedHours,
-          'deliveryMode': _deliveryMode,
-          'coachCharacter': _coachCharacter, // YENİ VERİ
-          'isApproved': false,
-          'isOnboardingCompleted': true,
-        },
-      );
+      Map<String, dynamic> updateData = {
+        'specialties': _selectedSpecialties,
+        'bio': _bioController.text.trim(),
+        'referenceLinks': referenceLinks,
+        'lessonSport': _selectedLessonSport,
+        'hourlyRate': int.tryParse(_priceController.text) ?? 0,
+        'availableDays': _selectedDays,
+        'availableHours': _selectedHours,
+        'deliveryMode': _deliveryMode,
+        'coachCharacter': _coachCharacter,
+        'isApproved': false,
+        'isOnboardingCompleted': true,
+      };
+
+      if (_needsLocation) {
+        updateData['location'] = {
+          'city': _selectedCity,
+          'district': _selectedDistrict,
+          'neighborhood': _selectedNeighborhood,
+          'addressDetail': _addressDetailController.text.trim(),
+          'addressTitle': _addressTitleController.text.trim(),
+        };
+      }
+
+      await _authService.updateUserProfile(uid: uid, data: updateData);
 
       if (mounted) {
         Navigator.pushAndRemoveUntil(
@@ -192,6 +339,8 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentPages = _pages;
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -224,7 +373,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: LinearProgressIndicator(
-                            value: (_currentIndex + 1) / 6,
+                            value: (_currentIndex + 1) / currentPages.length,
                             backgroundColor: Colors.white10,
                             color: ColorConstants.primaryColor,
                             minHeight: 6,
@@ -233,7 +382,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                       ),
                       const SizedBox(width: 15),
                       Text(
-                        "${_currentIndex + 1}/6",
+                        "${_currentIndex + 1}/${currentPages.length}",
                         style: GoogleFonts.poppins(
                           color: Colors.white54,
                           fontWeight: FontWeight.bold,
@@ -248,14 +397,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                     physics: const NeverScrollableScrollPhysics(),
                     onPageChanged: (index) =>
                         setState(() => _currentIndex = index),
-                    children: [
-                      _buildStep1Specialties(),
-                      _buildStep2Bio(),
-                      _buildStep3References(),
-                      _buildStep4LessonSport(),
-                      _buildStep5Availability(),
-                      _buildStep6Character(),
-                    ],
+                    children: currentPages,
                   ),
                 ),
                 Padding(
@@ -265,7 +407,9 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                           color: ColorConstants.primaryColor,
                         )
                       : CustomButton(
-                          text: _currentIndex == 5 ? "Tamamla" : "Devam Et",
+                          text: _currentIndex == currentPages.length - 1
+                              ? "Tamamla"
+                              : "Devam Et",
                           onPressed: _nextPage,
                         ),
                 ),
@@ -396,7 +540,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // BRANŞ SEÇİMİ
             Text(
               "Branş",
               style: GoogleFonts.poppins(
@@ -426,10 +569,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                 );
               }).toList(),
             ),
-
             const SizedBox(height: 24),
-
-            // DERS VERME ŞEKLİ (YENİ KISIM)
             Text(
               "Nasıl Ders Veriyorsun?",
               style: GoogleFonts.poppins(
@@ -447,10 +587,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                 _buildModeButton("Hibrit(İkisi de)", Icons.compare_arrows),
               ],
             ),
-
             const SizedBox(height: 24),
-
-            // ÜCRET
             Text(
               "Saatlik Ücret (TL)",
               style: GoogleFonts.poppins(
@@ -484,42 +621,131 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  // Yardımcı buton widget'ı
-  Widget _buildModeButton(String label, IconData icon) {
-    final isSelected = _deliveryMode == label;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _deliveryMode = label),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? ColorConstants.primaryColor : Colors.white10,
-            borderRadius: BorderRadius.circular(12),
-            border: isSelected
-                ? Border.all(color: ColorConstants.primaryColor)
-                : null,
+  // --- GÜÇLENDİRİLMİŞ KONUM ADIMI ---
+  Widget _buildStepLocation() {
+    return _buildStepContainer(
+      title: "Konum Bilgileri",
+      subtitle: "Öğrencilerinle nerede buluşacaksın?",
+      child: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDropdown(
+                  "İl",
+                  _citiesData.isEmpty
+                      ? ["Yükleniyor..."]
+                      : _citiesData.map((c) => c['name'].toString()).toList(),
+                  _selectedCity,
+                  (val) {
+                    if (val != null &&
+                        val != "Yükleniyor..." &&
+                        val != "Seçenek bulunamadı") {
+                      setState(() {
+                        _selectedCity = val;
+                        _selectedDistrict = null;
+                        _selectedNeighborhood = null;
+                      });
+                      final cityObj = _citiesData.firstWhere(
+                        (c) => c['name'] == val,
+                      );
+                      _fetchDistricts(cityObj['id']);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                _buildDropdown(
+                  "İlçe",
+                  _selectedCity == null
+                      ? ["Önce İl Seçin"]
+                      : _districtsData
+                            .map((d) => d['name'].toString())
+                            .toList(),
+                  _selectedDistrict,
+                  (val) {
+                    if (val != null &&
+                        val != "Önce İl Seçin" &&
+                        val != "Seçenek bulunamadı") {
+                      setState(() {
+                        _selectedDistrict = val;
+                        _selectedNeighborhood = null;
+                      });
+                      final districtObj = _districtsData.firstWhere(
+                        (d) => d['name'] == val,
+                      );
+                      _fetchNeighborhoods(districtObj['id']);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                _buildDropdown(
+                  "Semt / Mahalle",
+                  _selectedDistrict == null
+                      ? ["Önce İlçe Seçin"]
+                      : _neighborhoodsData
+                            .map((n) => n['name'].toString())
+                            .toList(),
+                  _selectedNeighborhood,
+                  (val) {
+                    if (val != null &&
+                        val != "Önce İlçe Seçin" &&
+                        val != "Seçenek bulunamadı") {
+                      setState(() => _selectedNeighborhood = val);
+                    }
+                  },
+                ),
+
+                const SizedBox(height: 24),
+                Text(
+                  "Adres Tarifi",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  _addressDetailController,
+                  "Örn: Metronun arka çıkışındaki parkın girişi...",
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Adres Başlığı(Doğru yazdığınızdan emin olun!!)",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  _addressTitleController,
+                  "Örn: MacFit Spor Salonu, Moda Parkı, X Yüzme Havuzu",
+                  maxLines: 1,
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
-          child: Column(
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.black : Colors.white,
-                size: 20,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  color: isSelected ? Colors.black : Colors.white,
-                  fontWeight: FontWeight.w600,
+
+          if (_isLoadingLocation)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: ColorConstants.primaryColor,
+                  ),
                 ),
               ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -591,7 +817,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  // YENİ EKLENEN 6. ADIM: KARAKTER
   Widget _buildStep6Character() {
     return _buildStepContainer(
       title: "Eğitmen Karakterin",
@@ -664,6 +889,125 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
           const SizedBox(height: 30),
           Expanded(child: child),
         ],
+      ),
+    );
+  }
+
+  Widget _buildModeButton(String label, IconData icon) {
+    final isSelected = _deliveryMode == label;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _deliveryMode = label),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? ColorConstants.primaryColor : Colors.white10,
+            borderRadius: BorderRadius.circular(12),
+            border: isSelected
+                ? Border.all(color: ColorConstants.primaryColor)
+                : null,
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? Colors.black : Colors.white,
+                size: 20,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: isSelected ? Colors.black : Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- KİLİTLENMEYE KARŞI GÜÇLENDİRİLMİŞ DROPDOWN ---
+  Widget _buildDropdown(
+    String label,
+    List<String> items,
+    String? selectedValue,
+    ValueChanged<String?> onChanged,
+  ) {
+    // 1. Tekrarlanan verileri engeller (Örn: İki tane Merkez Mah. varsa Flutter çökerdi)
+    final uniqueItems = items.toSet().toList();
+
+    // 2. Liste tamamen boşsa tıkanmasını önlemek için sahte bir öğe koyar
+    if (uniqueItems.isEmpty) {
+      uniqueItems.add("Seçenek bulunamadı");
+    }
+
+    final safeValue = uniqueItems.contains(selectedValue)
+        ? selectedValue
+        : null;
+
+    return DropdownButtonFormField<String>(
+      value: safeValue,
+      isExpanded: true,
+      dropdownColor: const Color(0xFF1E1E1E),
+      icon: const Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: Colors.white54,
+      ),
+      style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.poppins(color: Colors.white54, fontSize: 13),
+        filled: true,
+        fillColor: Colors.white10,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+      ),
+      items: uniqueItems
+          .map(
+            (item) => DropdownMenuItem(
+              value: item,
+              child: Text(item, overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildTextField(
+    TextEditingController controller,
+    String hint, {
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.poppins(color: Colors.white30, fontSize: 13),
+        filled: true,
+        fillColor: Colors.white10,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
     );
   }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart'; // Firebase Çekirdeği
 import 'firebase_options.dart'; // Yapılandırma dosyası (Otomatik oluştu)
-import 'screens/splash_screen.dart'; // Başlangıç ekranımız
 import 'core/constants/color_constants.dart';
+import 'widgets/auth_wrapper.dart';
 
 // Main artık "async" olmak zorunda çünkü Firebase'i bekleyeceğiz
 void main() async {
@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // Yine Splash Screen ile başlıyoruz
-      home: const SplashScreen(),
+      home: const AuthWrapper(),
     );
   }
 }

@@ -46,6 +46,9 @@ dependencies:
   intl: ^0.20.2
   agora_rtc_engine: ^6.5.3
   permission_handler: ^12.0.1
+  flutter_native_splash: ^2.4.7
+  url_launcher: ^6.3.2
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
@@ -70,7 +73,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/animations/Progression.json
     - assets/icons/
 
   # To add assets to your application, add an assets section, like this:
@@ -103,3 +105,10 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_native_splash:
+  color: "#0A0A0A" # CoachApp'in o şık koyu temasına uygun arka plan rengi
+  image: assets/images/temp_logo.png # Buraya geçici fotoğrafının yolunu yaz
+  android_12:
+    color: "#0A0A0A"
+    image: assets/images/temp_logo.png

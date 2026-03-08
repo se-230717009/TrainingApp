@@ -8,6 +8,7 @@ import '../core/constants/color_constants.dart';
 import '../widgets/scale_button.dart';
 import '../widgets/gradient_background.dart';
 import 'chat_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CoachDetailScreen extends StatefulWidget {
   final Map<String, dynamic> coachData;
@@ -725,10 +726,14 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
     final List<dynamic> days = widget.coachData['availableDays'] ?? [];
     final List<dynamic> hours = widget.coachData['availableHours'] ?? [];
 
+    // --- YENİ KONUM BİLGİLERİ ---
+    final Map<String, dynamic>? location = widget.coachData['location'];
+    final bool isFaceToFace =
+        deliveryMode == "Yüzyüze" || deliveryMode == "Hibrit(İkisi de)";
+
     return GradientBackground(
       child: Scaffold(
-        backgroundColor:
-            Colors.transparent, // Arka plan için transparan yapıldı
+        backgroundColor: Colors.transparent,
         body: SingleChildScrollView(
           padding: const EdgeInsets.only(bottom: 40),
           child: Column(
@@ -796,44 +801,21 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                   Positioned(
                     top: 50,
                     right: 20,
-                    child: Row(
-                      children: [
-                        ScaleButton(
-                          onPressed: () => _showCoachCalendarModal(
-                            days,
-                          ), // TAKVİM BUTONU BURADA
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.black26,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white12),
-                            ),
-                            child: const Icon(
-                              Icons.calendar_month_outlined,
-                              color: Colors.white,
-                              size: 22,
-                            ),
-                          ),
+                    child: ScaleButton(
+                      onPressed: () {},
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white12),
                         ),
-                        const SizedBox(width: 8),
-                        ScaleButton(
-                          onPressed: () {},
-                          child: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.black26,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white12),
-                            ),
-                            child: const Icon(
-                              Icons.favorite_border_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
+                        child: const Icon(
+                          Icons.favorite_border_rounded,
+                          color: Colors.white,
+                          size: 24,
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ],
@@ -939,7 +921,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         ),
                         const SizedBox(width: 12),
                         StreamBuilder<QuerySnapshot>(
-                          // DİKKAT: ARTIK HERKESİN ALDIĞI DERSİ GÖRMEK İÇİN 'athleteId' FİLTRESİ KALDIRILDI
                           stream: _firestore
                               .collection('lessons')
                               .where('coachId', isEqualTo: coachUid)
@@ -947,7 +928,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                           builder: (context, snapshot) {
                             bool isBookedByMe = false;
                             bool isBookedBySomeoneElse = false;
-
                             if (snapshot.hasData) {
                               for (var doc in snapshot.data!.docs) {
                                 if (doc['status'] == 'pending' ||
@@ -961,7 +941,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                 }
                               }
                             }
-
                             if (isBookedByMe) {
                               return Expanded(
                                 flex: 2,
@@ -1003,7 +982,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                 ),
                               );
                             } else if (isBookedBySomeoneElse) {
-                              // BAŞKASI ALDIYSA KİLİTLİ BUTON
                               return Expanded(
                                 flex: 2,
                                 child: Container(
@@ -1206,7 +1184,83 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         );
                       },
                     ),
+
                     const SizedBox(height: 24),
+
+                    // ŞIK TAKVİM BUTONU
+                    ScaleButton(
+                      onPressed: () => _showCoachCalendarModal(days),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 20,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              ColorConstants.primaryColor.withOpacity(0.15),
+                              Colors.transparent,
+                            ],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: ColorConstants.primaryColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: ColorConstants.primaryColor.withOpacity(
+                                  0.2,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.calendar_month_rounded,
+                                color: ColorConstants.primaryColor,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Eğitmenin Takvimi",
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    "Müsait günleri ve ders programı",
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white54,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              color: Colors.white38,
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
                     Text(
                       "Hakkında",
                       style: GoogleFonts.poppins(
@@ -1225,6 +1279,138 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+
+                    // --- YENİ EKLENEN KONUM BİLGİSİ WIDGET'I ---
+                    if (isFaceToFace && location != null) ...[
+                      Text(
+                        "Konum Bilgisi",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // TIKLANABİLİR YAPTIK
+                      ScaleButton(
+                        onPressed: () async {
+                          // Adresi birleştirip bir arama sorgusu oluşturuyoruz
+                          final String query =
+                              "${location['addressTitle']} ${location['neighborhood']} ${location['district']} ${location['city']}";
+                          // Google Haritalar evrensel arama linki (iOS ve Android'de harita uygulamasını tetikler)
+                          final Uri mapUrl = Uri.parse(
+                            "https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}",
+                          );
+
+                          if (await canLaunchUrl(mapUrl)) {
+                            await launchUrl(
+                              mapUrl,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          } else {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    "Harita açılamadı.",
+                                    style: GoogleFonts.poppins(),
+                                  ),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white10),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: ColorConstants.primaryColor
+                                          .withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.location_on_rounded,
+                                      color: ColorConstants.primaryColor,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          location['addressTitle'] ?? "Adres",
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          "${location['district'] ?? ''}, ${location['city'] ?? ''}",
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white54,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // KULLANICIYA TIKLANABİLİR OLDUĞUNU GÖSTERMEK İÇİN YÖN İKONU
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white10,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.navigation_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Divider(
+                                  color: Colors.white10,
+                                  height: 1,
+                                ),
+                              ),
+                              Text(
+                                "${location['neighborhood'] ?? ''} - ${location['addressDetail'] ?? ''}",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                    // ------------------------------------------
+
+                    // ------------------------------------------
                     Text(
                       "Ders Detayları",
                       style: GoogleFonts.poppins(

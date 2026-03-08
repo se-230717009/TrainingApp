@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
 import '../services/auth_service.dart';
 import '../widgets/scale_button.dart';
+import '../widgets/gradient_background.dart'; // YENİ EKLENDİ
 import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'coach_calender_screen.dart';
@@ -22,7 +23,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
   final AuthService _authService = AuthService();
   final String _uid = FirebaseAuth.instance.currentUser!.uid;
 
-  // --- ÇIKIŞ YAP ---
   void _signOut() async {
     await _authService.signOut();
     if (mounted) {
@@ -34,7 +34,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     }
   }
 
-  // --- AYARLAR MENÜSÜ ---
   void _showSettingsModal() {
     showModalBottomSheet(
       context: context,
@@ -103,144 +102,178 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true,
-      // --- ÜST BAR ---
-      appBar: AppBar(
-        backgroundColor: Colors.black.withOpacity(0.6),
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        centerTitle: false,
-        titleSpacing: 24,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF1A1A1A), Colors.transparent],
+    return GradientBackground(
+      // YENİ: MERKEZİ ARKA PLAN EKLENDİ
+      child: Scaffold(
+        backgroundColor: Colors.transparent, // YENİ: TRANSPARAN YAPILDI
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.black.withOpacity(0.6),
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          centerTitle: false,
+          titleSpacing: 24,
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF1A1A1A), Colors.transparent],
+              ),
             ),
           ),
-        ),
-        title: PopupMenuButton<String>(
-          color: const Color(0xFF1E1E1E),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          offset: const Offset(0, 45),
-          onSelected: (value) {
-            if (value == 'takvimim') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CoachCalendarScreen(),
-                ),
-              );
-            } else if (value == 'mesajlarim') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CoachMessagesScreen(),
-                ),
-              );
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'panelim',
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.dashboard_outlined,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    "Panelim",
-                    style: GoogleFonts.poppins(color: Colors.white),
-                  ),
-                ],
-              ),
+          title: PopupMenuButton<String>(
+            color: const Color(0xFF1E1E1E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            PopupMenuItem(
-              value: 'takvimim',
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.calendar_month_outlined,
-                    color: Colors.white,
-                    size: 20,
+            offset: const Offset(0, 45),
+            onSelected: (value) {
+              if (value == 'takvimim') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CoachCalendarScreen(),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    "Takvimim",
-                    style: GoogleFonts.poppins(color: Colors.white),
+                );
+              } else if (value == 'mesajlarim') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CoachMessagesScreen(),
                   ),
-                ],
-              ),
-            ),
-            PopupMenuItem(
-              value: 'mesajlarim',
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.chat_bubble_outline_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    "Mesajlarım",
-                    style: GoogleFonts.poppins(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "Panelim",
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                );
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'panelim',
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.dashboard_outlined,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      "Panelim",
+                      style: GoogleFonts.poppins(color: Colors.white),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: Colors.white54,
-                size: 24,
+              PopupMenuItem(
+                value: 'takvimim',
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_month_outlined,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      "Takvimim",
+                      style: GoogleFonts.poppins(color: Colors.white),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 8),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: ColorConstants.primaryColor,
-                  shape: BoxShape.circle,
+              PopupMenuItem(
+                value: 'mesajlarim',
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      "Mesajlarım",
+                      style: GoogleFonts.poppins(color: Colors.white),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
-        ),
-        actions: [
-          ScaleButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CoachNotificationsScreen(),
-                ),
-              );
-            },
-            child: Stack(
-              alignment: Alignment.topRight,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                Text(
+                  "Panelim",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: Colors.white54,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
                 Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: ColorConstants.primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            ScaleButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CoachNotificationsScreen(),
+                  ),
+                );
+              },
+              child: Stack(
+                alignment: Alignment.topRight,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  Positioned(
+                    right: 2,
+                    top: 2,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.black, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: ScaleButton(
+                onPressed: _showSettingsModal,
+                child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.1),
@@ -248,183 +281,158 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                     border: Border.all(color: Colors.white12),
                   ),
                   child: const Icon(
-                    Icons.notifications_none_rounded,
+                    Icons.person,
                     color: Colors.white,
                     size: 24,
                   ),
                 ),
-                // Küçük kırmızı bildirim noktası
-                Positioned(
-                  right: 2,
-                  top: 2,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black, width: 2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: ScaleButton(
-              onPressed: _showSettingsModal,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: const Icon(Icons.person, color: Colors.white, size: 24),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
 
-      // --- GÖVDE ---
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(_uid)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(
-                color: ColorConstants.primaryColor,
-              ),
-            );
-          }
-
-          if (snapshot.hasError ||
-              !snapshot.hasData ||
-              !snapshot.data!.exists) {
-            return _buildErrorState();
-          }
-
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-
-          // isApproved veya isVerified alanlarından birini kontrol et
-          final bool isVerified =
-              data['isApproved'] ?? data['isVerified'] ?? false;
-          final String userName = data['name'] ?? 'Antrenör';
-          final String? lessonSport = data['lessonSport'];
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Hoşgeldin Mesajı
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-                child: Text(
-                  "Merhaba, $userName 👋",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white70,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Henüz onaylanmamışsa Banner'ı göster
-              if (!isVerified) _buildVerificationBanner(),
-
-              // ANA İÇERİK: Ders varsa vitrini göster, yoksa boş durumu göster
-              Expanded(
-                child: lessonSport == null
-                    ? _buildEmptyState(isVerified)
-                    : SingleChildScrollView(child: _buildProfilePreview(data)),
-              ),
-            ],
-          );
-        },
-      ),
-
-      // --- FAB: Sadece Onaylıysa Aktif ---
-      floatingActionButton: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(_uid)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData || !snapshot.data!.exists) {
-            return const SizedBox.shrink();
-          }
-
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-          final bool isVerified =
-              data['isApproved'] ?? data['isVerified'] ?? false;
-
-          if (!isVerified) return const SizedBox.shrink();
-
-          return ScaleButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    "Ders ekleme ekranı yakında gelecek!",
-                    style: GoogleFonts.poppins(),
-                  ),
-                  backgroundColor: ColorConstants.primaryColor,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+        body: StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(_uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  color: ColorConstants.primaryColor,
                 ),
               );
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              decoration: BoxDecoration(
-                color: ColorConstants.primaryColor,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: ColorConstants.primaryColor.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.add_rounded, color: Colors.white, size: 22),
-                  const SizedBox(width: 8),
-                  Text(
-                    "Yeni Ders Ekle",
+            }
+
+            if (snapshot.hasError ||
+                !snapshot.hasData ||
+                !snapshot.data!.exists) {
+              return _buildErrorState();
+            }
+
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            final bool isVerified =
+                data['isApproved'] ?? data['isVerified'] ?? false;
+            final String userName = data['name'] ?? 'Antrenör';
+            final String? lessonSport = data['lessonSport'];
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // YENİ: APPBAR'IN ALTINDA EZİLMEMESİ İÇİN DİNAMİK BOŞLUK
+                SizedBox(
+                  height:
+                      MediaQuery.of(context).padding.top + kToolbarHeight + 16,
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    "Merhaba, $userName 👋",
                     style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      color: Colors.white70,
+                      fontSize: 16,
                     ),
                   ),
-                ],
+                ),
+                const SizedBox(height: 16),
+
+                if (!isVerified) _buildVerificationBanner(),
+
+                Expanded(
+                  child: lessonSport == null
+                      ? _buildEmptyState(isVerified)
+                      : SingleChildScrollView(
+                          child: _buildProfilePreview(data),
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+
+        floatingActionButton: StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(_uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData || !snapshot.data!.exists)
+              return const SizedBox.shrink();
+
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            final bool isVerified =
+                data['isApproved'] ?? data['isVerified'] ?? false;
+
+            if (!isVerified) return const SizedBox.shrink();
+
+            return ScaleButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      "Ders ekleme ekranı yakında gelecek!",
+                      style: GoogleFonts.poppins(),
+                    ),
+                    backgroundColor: ColorConstants.primaryColor,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: ColorConstants.primaryColor,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: ColorConstants.primaryColor.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.add_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      "Yeni Ders Ekle",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
 
-  // --- KULLANICI GÖZÜNDEN PROFİL VİTRİNİ ---
   Widget _buildProfilePreview(Map<String, dynamic> data) {
-    final String name = data['name'] ?? '';
-    final String surname = data['surname'] ?? '';
-    final String fullName = "$name $surname".trim().isEmpty
+    final String fullName =
+        "${data['name'] ?? ''} ${data['surname'] ?? ''}".trim().isEmpty
         ? "İsimsiz Antrenör"
-        : "$name $surname";
+        : "${data['name']} ${data['surname']}";
     final String? profileImageUrl = data['profileImageUrl'];
     final String bio = data['bio'] ?? 'Henüz biyografi eklenmemiş.';
-
     final String lessonSport = data['lessonSport'] ?? 'Belirtilmemiş';
     final List<dynamic> days = data['availableDays'] ?? [];
     final List<dynamic> hours = data['availableHours'] ?? [];
@@ -463,7 +471,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Profil Üst Kısım (Fotoğraf ve İsim)
                 Row(
                   children: [
                     CircleAvatar(
@@ -507,8 +514,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // Biyografi
                 Text(
                   bio,
                   style: GoogleFonts.poppins(
@@ -520,8 +525,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                 const SizedBox(height: 20),
                 const Divider(color: Colors.white10),
                 const SizedBox(height: 16),
-
-                // Ders Bilgileri
                 Text(
                   "Aktif Dersin",
                   style: GoogleFonts.poppins(
@@ -531,8 +534,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // Branş Chip'i
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -552,8 +553,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // Günler ve Saatler
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -603,7 +602,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 
-  // --- ONAY BEKLENİYOR BANNER ---
   Widget _buildVerificationBanner() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
@@ -667,7 +665,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 
-  // --- BOŞ DURUM (Empty State) ---
   Widget _buildEmptyState(bool isVerified) {
     return Center(
       child: Padding(
@@ -715,7 +712,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 
-  // --- HATA DURUMU ---
   Widget _buildErrorState() {
     return Center(
       child: Padding(
@@ -749,7 +745,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 
-  // --- MENÜ ÖĞESİ ---
   Widget _buildMenuItem(
     IconData icon,
     String text,
