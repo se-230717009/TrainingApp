@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
 import '../services/auth_service.dart';
 import '../widgets/scale_button.dart';
-import '../widgets/gradient_background.dart';
 import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'my_lessons_screen.dart';
@@ -23,16 +22,145 @@ class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
   final String _uid = FirebaseAuth.instance.currentUser!.uid;
 
+  // Sporcu Bilgileri
   String _athleteName = "Sporcu";
   String _athleteGoal = "";
   List<String> _interestedSports = [];
   String _preferredGender = "Farketmez";
   List<String> _availableDays = [];
   List<String> _availableHours = [];
+
   StreamSubscription<QuerySnapshot>? _lessonsSubscription;
   StreamSubscription<QuerySnapshot>? _allLessonsSubscription;
   List<String> _bookedCoachIds = [];
   Set<String> _anyoneBookedCoachIds = {};
+
+  // --- ARAMA VE DETAYLI FİLTRELEME DEĞİŞKENLERİ ---
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+  RangeValues _priceRange = const RangeValues(0, 3000);
+  String? _filterDeliveryMode; // null: Hepsi, "Online", "Yüzyüze"
+  bool _sortByCheapest = false;
+
+  // YENİ FİLTRELER
+  String? _filterSport;
+  String? _filterGender;
+  String? _filterCity;
+  List<String> _filterDays = [];
+  final List<String> _cities = [
+    "Adana",
+    "Adıyaman",
+    "Afyonkarahisar",
+    "Ağrı",
+    "Aksaray",
+    "Amasya",
+    "Ankara",
+    "Antalya",
+    "Ardahan",
+    "Artvin",
+    "Aydın",
+    "Balıkesir",
+    "Bartın",
+    "Batman",
+    "Bayburt",
+    "Bilecik",
+    "Bingöl",
+    "Bitlis",
+    "Bolu",
+    "Burdur",
+    "Bursa",
+    "Çanakkale",
+    "Çankırı",
+    "Çorum",
+    "Denizli",
+    "Diyarbakır",
+    "Düzce",
+    "Edirne",
+    "Elazığ",
+    "Erzincan",
+    "Erzurum",
+    "Eskişehir",
+    "Gaziantep",
+    "Giresun",
+    "Gümüşhane",
+    "Hakkâri",
+    "Hatay",
+    "Iğdır",
+    "Isparta",
+    "İstanbul",
+    "İzmir",
+    "Kahramanmaraş",
+    "Karabük",
+    "Karaman",
+    "Kars",
+    "Kastamonu",
+    "Kayseri",
+    "Kırıkkale",
+    "Kırklareli",
+    "Kırşehir",
+    "Kilis",
+    "Kocaeli",
+    "Konya",
+    "Kütahya",
+    "Malatya",
+    "Manisa",
+    "Mardin",
+    "Mersin",
+    "Muğla",
+    "Muş",
+    "Nevşehir",
+    "Niğde",
+    "Ordu",
+    "Osmaniye",
+    "Rize",
+    "Sakarya",
+    "Samsun",
+    "Siirt",
+    "Sinop",
+    "Sivas",
+    "Şanlıurfa",
+    "Şırnak",
+    "Tekirdağ",
+    "Tokat",
+    "Trabzon",
+    "Tunceli",
+    "Uşak",
+    "Van",
+    "Yalova",
+    "Yozgat",
+    "Zonguldak",
+  ];
+  List<String> _filterHours = [];
+
+  final List<String> _allSports = [
+    "Fitness",
+    "Pilates",
+    "Yoga",
+    "Yüzme",
+    "Boks",
+    "Kick Boks",
+    "CrossFit",
+    "Tenis",
+    "Futbol",
+    "Basketbol",
+  ];
+  final List<String> _allDays = [
+    "Pazartesi",
+    "Salı",
+    "Çarşamba",
+    "Perşembe",
+    "Cuma",
+    "Cumartesi",
+    "Pazar",
+  ];
+  final List<String> _allHours = [
+    "06:00 - 09:00",
+    "09:00 - 12:00",
+    "12:00 - 15:00",
+    "15:00 - 18:00",
+    "18:00 - 21:00",
+    "21:00 - 00:00",
+  ];
 
   @override
   void initState() {
@@ -84,6 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _lessonsSubscription?.cancel();
     _allLessonsSubscription?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -107,6 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int _calculateMatchScore(Map<String, dynamic> coach) {
     int score = 0;
+
     String idealCoachCharacter = "";
     switch (_athleteGoal) {
       case "Kilo Vermek":
@@ -152,6 +282,373 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // --- KAPSAMLI FİLTRELEME MODALI (Bottom Sheet) ---
+  void _showFilterModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors
+          .transparent, // Arka planı Draggable yapısına uyması için şeffaf yaptık
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.85, // Ekranın %85'ini kaplar
+              minChildSize: 0.5,
+              maxChildSize: 0.95,
+              builder: (_, controller) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(24),
+                  child: ListView(
+                    controller: controller, // Kaydırılabilir olması için
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[700],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Detaylı Arama",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setModalState(() {
+                                _priceRange = const RangeValues(0, 3000);
+                                _filterDeliveryMode = null;
+                                _filterSport = null;
+                                _filterGender = null;
+                                _filterCity = "";
+                                _filterDays.clear();
+                                _filterHours.clear();
+                              });
+                            },
+                            child: Text(
+                              "Temizle",
+                              style: GoogleFonts.poppins(
+                                color: Colors.redAccent,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // 1. DERS ŞEKLİ
+                      Text(
+                        "Ders Şekli",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing:
+                            10, // Taşma hatasını önlemek için Wrap kullanıldı
+                        children: ["Hepsi", "Online", "Yüzyüze"].map((mode) {
+                          final isSelected =
+                              (_filterDeliveryMode ?? "Hepsi") == mode;
+                          return ChoiceChip(
+                            label: Text(mode),
+                            selected: isSelected,
+                            selectedColor: ColorConstants.primaryColor,
+                            backgroundColor: Colors.white10,
+                            labelStyle: GoogleFonts.poppins(
+                              color: Colors.black, // Yazı her zaman simsiyah
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                            ),
+                            onSelected: (val) {
+                              setModalState(
+                                () => _filterDeliveryMode = mode == "Hepsi"
+                                    ? null
+                                    : mode,
+                              );
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 2. KONUM (Sadece Yüzyüze veya Hepsi seçiliyse göster)
+                      // 2. KONUM (Sadece Yüzyüze veya Hepsi seçiliyse göster)
+                      if (_filterDeliveryMode == null ||
+                          _filterDeliveryMode == "Yüzyüze") ...[
+                        Text(
+                          "Konum (Şehir)",
+                          style: GoogleFonts.poppins(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          value: _filterCity,
+                          dropdownColor: const Color(0xFF1E1E1E),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Colors.white54,
+                          ),
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: "Şehir Seçin",
+                            hintStyle: GoogleFonts.poppins(
+                              color: Colors.white54,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white10,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          items: _cities
+                              .map(
+                                (c) =>
+                                    DropdownMenuItem(value: c, child: Text(c)),
+                              )
+                              .toList(),
+                          onChanged: (val) =>
+                              setModalState(() => _filterCity = val),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      // 3. BRANŞ
+                      Text(
+                        "Branş Seçimi",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _allSports.map((sport) {
+                          final isSelected = _filterSport == sport;
+                          return ChoiceChip(
+                            label: Text(sport),
+                            selected: isSelected,
+                            selectedColor: ColorConstants.primaryColor,
+                            backgroundColor: Colors.white10,
+                            labelStyle: GoogleFonts.poppins(
+                              color: Colors.black, // Yazı her zaman simsiyah
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                            ),
+                            onSelected: (val) => setModalState(
+                              () => _filterSport = val ? sport : null,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 4. CİNSİYET
+                      Text(
+                        "Eğitmen Cinsiyeti",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: ["Farketmez", "Erkek", "Kadın"].map((gender) {
+                          final isSelected =
+                              (_filterGender ?? "Farketmez") == gender;
+                          return ChoiceChip(
+                            label: Text(gender),
+                            selected: isSelected,
+                            selectedColor: ColorConstants.primaryColor,
+                            backgroundColor: Colors.white10,
+                            labelStyle: GoogleFonts.poppins(
+                              color: Colors.black, // Yazı her zaman simsiyah
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                            ),
+                            onSelected: (val) => setModalState(
+                              () => _filterGender = gender == "Farketmez"
+                                  ? null
+                                  : gender,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 5. MÜSAİTLİK GÜNLERİ
+                      Text(
+                        "Uygun Günler",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _allDays.map((day) {
+                          final isSelected = _filterDays.contains(day);
+                          return ChoiceChip(
+                            label: Text(day),
+                            selected: isSelected,
+                            selectedColor: ColorConstants.primaryColor,
+                            backgroundColor: Colors.white10,
+                            labelStyle: GoogleFonts.poppins(
+                              color: Colors.black, // Yazı her zaman simsiyah
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                            ),
+                            onSelected: (val) => setModalState(
+                              () => val
+                                  ? _filterDays.add(day)
+                                  : _filterDays.remove(day),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 6. MÜSAİTLİK SAATLERİ
+                      Text(
+                        "Uygun Saatler",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _allHours.map((hour) {
+                          final isSelected = _filterHours.contains(hour);
+                          return ChoiceChip(
+                            label: Text(hour),
+                            selected: isSelected,
+                            selectedColor: ColorConstants.primaryColor,
+                            backgroundColor: Colors.white10,
+                            labelStyle: GoogleFonts.poppins(
+                              color: Colors.black, // Yazı her zaman simsiyah
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w600,
+                            ),
+                            onSelected: (val) => setModalState(
+                              () => val
+                                  ? _filterHours.add(hour)
+                                  : _filterHours.remove(hour),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 7. FİYAT ARALIĞI
+                      Text(
+                        "Saatlik Ücret Aralığı",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      RangeSlider(
+                        values: _priceRange,
+                        min: 0,
+                        max: 3000,
+                        divisions: 30,
+                        activeColor: ColorConstants.primaryColor,
+                        inactiveColor: Colors.white10,
+                        labels: RangeLabels(
+                          "${_priceRange.start.round()} ₺",
+                          "${_priceRange.end.round()} ₺",
+                        ),
+                        onChanged: (val) =>
+                            setModalState(() => _priceRange = val),
+                      ),
+
+                      const SizedBox(height: 40),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(
+                              () {},
+                            ); // Modal kapanırken ana ekranı güncelle
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ColorConstants.primaryColor,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Text(
+                            "Filtreleri Uygula",
+                            style: GoogleFonts.poppins(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // --- AYARLAR MENÜSÜ ---
   void _showSettingsModal() {
     showModalBottomSheet(
       context: context,
@@ -256,8 +753,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          Colors.transparent, // Scaffold transparan ki gradyan görünsün
+      backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.black.withOpacity(0.6),
@@ -281,13 +777,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           offset: const Offset(0, 45),
           onSelected: (value) {
-            if (value == 'derslerim')
+            if (value == 'derslerim') {
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const MyLessonsScreen(),
                 ),
               );
+            }
           },
           itemBuilder: (context) => [
             PopupMenuItem(
@@ -372,23 +869,115 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: GradientBackground(
-        // YENİ GRADYAN WIDGET BURADA KULLANILDI
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1C1C1C), Color(0xFF0A0A0A)],
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            SizedBox(
+              height: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+            ),
+
+            // SELAMLAMA METNİ GERİ GELDİ 🔥
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                24,
-                MediaQuery.of(context).padding.top + kToolbarHeight + 8,
-                24,
-                16,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
                 "Antrenmanlara Başla, $_athleteName 🔥",
                 style: GoogleFonts.poppins(color: Colors.white70, fontSize: 16),
               ),
             ),
+            const SizedBox(height: 16),
+
+            // ARAMA ÇUBUĞU VE FİLTRE BUTONU
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (val) =>
+                            setState(() => _searchQuery = val.toLowerCase()),
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: "Eğitmen, branş veya şehir ara...",
+                          hintStyle: GoogleFonts.poppins(color: Colors.white38),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: Colors.white38,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ScaleButton(
+                    onPressed: _showFilterModal,
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: ColorConstants.primaryColor,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.tune_rounded,
+                        color: Colors.black,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // HIZLI FİLTRE ÇİPLERİ (Yazılar siyah yapıldı, kontrast artırıldı)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  _buildQuickChip(
+                    "Online",
+                    _filterDeliveryMode == "Online",
+                    () {
+                      setState(() => _filterDeliveryMode = "Online");
+                    },
+                  ),
+                  _buildQuickChip(
+                    "Yüzyüze",
+                    _filterDeliveryMode == "Yüzyüze",
+                    () {
+                      setState(() => _filterDeliveryMode = "Yüzyüze");
+                    },
+                  ),
+                  _buildQuickChip("En Ucuz", _sortByCheapest, () {
+                    setState(() => _sortByCheapest = !_sortByCheapest);
+                  }, icon: Icons.local_offer_rounded),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -404,15 +993,99 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     );
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
-                    return const SizedBox();
+                    return _buildEmptyState();
+
+                  // KAPSAMLI FİLTRELEME MANTIĞI
+                  final filteredDocs = snapshot.data!.docs.where((doc) {
+                    final coach = doc.data() as Map<String, dynamic>;
+                    final name = "${coach['name']} ${coach['surname']}"
+                        .toLowerCase();
+                    final sport = (coach['lessonSport'] ?? "")
+                        .toString()
+                        .toLowerCase();
+                    final city = coach['location'] != null
+                        ? (coach['location']['city'] ?? "")
+                              .toString()
+                              .toLowerCase()
+                        : "";
+                    final price = coach['hourlyRate'] ?? 0;
+                    final mode = coach['deliveryMode'] ?? "";
+                    final gender = coach['gender'] ?? "";
+                    final List<dynamic> days = coach['availableDays'] ?? [];
+                    final List<dynamic> hours = coach['availableHours'] ?? [];
+
+                    // 1. Arama Çubuğu (Kelime eşleşmesi)
+                    bool matchesSearch =
+                        _searchQuery.isEmpty ||
+                        name.contains(_searchQuery) ||
+                        sport.contains(_searchQuery) ||
+                        city.contains(_searchQuery);
+
+                    // 2. Fiyat Kontrolü
+                    bool matchesPrice =
+                        price >= _priceRange.start && price <= _priceRange.end;
+
+                    // 3. Ders Şekli (Hibrit uyumlu)
+                    bool matchesMode = true;
+                    if (_filterDeliveryMode != null) {
+                      if (_filterDeliveryMode == "Online") {
+                        matchesMode =
+                            mode == "Online" || mode == "Hibrit(İkisi de)";
+                      } else if (_filterDeliveryMode == "Yüzyüze") {
+                        matchesMode =
+                            mode == "Yüzyüze" || mode == "Hibrit(İkisi de)";
+                      }
+                    }
+
+                    // 4. Branş Kontrolü
+                    bool matchesSport =
+                        _filterSport == null ||
+                        sport == _filterSport!.toLowerCase();
+
+                    // 5. Cinsiyet Kontrolü
+                    bool matchesGender =
+                        _filterGender == null || gender == _filterGender;
+
+                    // 6. Şehir Kontrolü (Dropdown'dan seçildiyse)
+                    bool matchesCity =
+                        _filterCity == null ||
+                        city == _filterCity!.toLowerCase();
+                    // 7. Gün ve Saat Kontrolü (Seçili günlerden/saatlerden EN AZ BİRİ uyuşuyorsa gösterir)
+                    bool matchesDays =
+                        _filterDays.isEmpty ||
+                        _filterDays.any((d) => days.contains(d));
+                    bool matchesHours =
+                        _filterHours.isEmpty ||
+                        _filterHours.any((h) => hours.contains(h));
+
+                    return matchesSearch &&
+                        matchesPrice &&
+                        matchesMode &&
+                        matchesSport &&
+                        matchesGender &&
+                        matchesCity &&
+                        matchesDays &&
+                        matchesHours;
+                  }).toList();
+
+                  if (filteredDocs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        "Kriterlerine uygun eğitmen bulunamadı.",
+                        style: GoogleFonts.poppins(color: Colors.white54),
+                      ),
+                    );
+                  }
 
                   List<Map<String, dynamic>> perfectMatches = [];
                   List<Map<String, dynamic>> alternativeMatches = [];
 
-                  for (var doc in snapshot.data!.docs) {
+                  // İLGİ ALANINA GÖRE AYIR
+                  for (var doc in filteredDocs) {
                     final coach = doc.data() as Map<String, dynamic>;
                     coach['uid'] = doc.id;
                     final lessonSport = coach['lessonSport'] ?? '';
+
                     if (_interestedSports.contains(lessonSport)) {
                       perfectMatches.add(coach);
                     } else {
@@ -420,11 +1093,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     }
                   }
 
-                  perfectMatches.sort(
-                    (a, b) => _calculateMatchScore(
-                      b,
-                    ).compareTo(_calculateMatchScore(a)),
-                  );
+                  // SIRALAMA
+                  if (_sortByCheapest) {
+                    perfectMatches.sort(
+                      (a, b) => (a['hourlyRate'] ?? 0).compareTo(
+                        b['hourlyRate'] ?? 0,
+                      ),
+                    );
+                    alternativeMatches.sort(
+                      (a, b) => (a['hourlyRate'] ?? 0).compareTo(
+                        b['hourlyRate'] ?? 0,
+                      ),
+                    );
+                  } else {
+                    perfectMatches.sort(
+                      (a, b) => _calculateMatchScore(
+                        b,
+                      ).compareTo(_calculateMatchScore(a)),
+                    );
+                  }
+
                   final int maxScore = _calculateMaxScore();
 
                   return ListView(
@@ -445,7 +1133,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         SizedBox(
                           height: 260,
                           child: ListView.builder(
-                            scrollDirection: Axis.horizontal, // YATAY KAYDIRMA
+                            scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.only(left: 24, right: 8),
                             itemCount: perfectMatches.length,
                             itemBuilder: (ctx, i) {
@@ -460,6 +1148,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   width: 290,
                                   child: _buildCoachCard(
                                     coach,
+                                    isHorizontal: true,
                                     matchPercent: matchPct,
                                   ),
                                 ),
@@ -485,16 +1174,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         SizedBox(
                           height: 260,
                           child: ListView.builder(
-                            scrollDirection: Axis.horizontal, // YATAY KAYDIRMA
+                            scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.only(left: 24, right: 8),
                             itemCount: alternativeMatches.length,
                             itemBuilder: (ctx, i) {
-                              final coach = alternativeMatches[i];
                               return Padding(
                                 padding: const EdgeInsets.only(right: 16),
                                 child: SizedBox(
                                   width: 290,
-                                  child: _buildCoachCard(coach),
+                                  child: _buildCoachCard(alternativeMatches[i]),
                                 ),
                               );
                             },
@@ -513,16 +1201,57 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // --- HIZLI FİLTRE ÇİPİ (RENK VE OKUNABİLİRLİK DÜZELTİLDİ) ---
+  Widget _buildQuickChip(
+    String label,
+    bool isSelected,
+    VoidCallback onTap, {
+    IconData? icon,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: ActionChip(
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: Colors.black),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: Colors.black, // YAZILAR ARTIK SİMSİYAH VE ÇOK NET!
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+        // Seçiliyse fosforlu yeşil, seçili değilse düz beyaz
+        backgroundColor: isSelected
+            ? ColorConstants.primaryColor
+            : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide.none,
+        ),
+        onPressed: onTap,
+      ),
+    );
+  }
+
+  // --- ANTRENÖR / DERS KARTI ---
   Widget _buildCoachCard(
     Map<String, dynamic> coachData, {
+    bool isHorizontal = false,
     int matchPercent = 0,
   }) {
-    final String fullName =
-        "${coachData['name'] ?? ''} ${coachData['surname'] ?? ''}"
-            .trim()
-            .isEmpty
+    final String name = coachData['name'] ?? '';
+    final String surname = coachData['surname'] ?? '';
+    final String fullName = "$name $surname".trim().isEmpty
         ? "İsimsiz Antrenör"
-        : "${coachData['name']} ${coachData['surname']}";
+        : "$name $surname";
     final String? profileImageUrl = coachData['profileImageUrl'];
     final int hourlyRate = coachData['hourlyRate'] ?? 0;
     final String lessonSport = coachData['lessonSport'] ?? 'Genel Antrenman';
@@ -533,8 +1262,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool isMyBooking = _bookedCoachIds.contains(coachUid);
     final bool isAnyoneBooked =
         _anyoneBookedCoachIds.contains(coachUid) && !isMyBooking;
-    final bool isHighMatch =
-        matchPercent > 50; // YÜZDE 50'DEN BÜYÜKSE PARLAMA EFEKTİ
+    final bool isHighMatch = matchPercent >= 20;
 
     Color borderColor = Colors.white10;
     Color bgColor = Colors.white.withOpacity(0.05);
@@ -544,9 +1272,7 @@ class _HomeScreenState extends State<HomeScreen> {
       borderColor = Colors.green.withOpacity(0.3);
       bgColor = Colors.green.withOpacity(0.05);
     } else if (isAnyoneBooked) {
-      borderColor = Colors.redAccent.withOpacity(
-        0.6,
-      ); // BAŞKASI ALDIYSA İNCE KIRMIZI ÇİZGİ
+      borderColor = Colors.redAccent.withOpacity(0.6);
       bgColor = Colors.redAccent.withOpacity(0.04);
     } else if (isHighMatch) {
       borderColor = ColorConstants.primaryColor.withOpacity(0.5);
@@ -628,16 +1354,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     if (isMyBooking)
                       _badge("✅ Alındı", Colors.green)
                     else if (isAnyoneBooked)
-                      _badge(
-                        "Ders Alındı",
-                        Colors.redAccent,
-                      ) // BAŞKASI ALDIYSA KIRMIZI ETİKET
+                      _badge("Ders Alındı", Colors.redAccent)
                     else if (isHighMatch)
                       _badge(
                         "Kriterlerine Çok Uygun 🔥",
                         ColorConstants.primaryColor,
-                      ), // ALEV EMOJİSİ EKLENDİ
-
+                      ),
                     if (hourlyRate > 0) ...[
                       const SizedBox(height: 4),
                       Container(
@@ -774,5 +1496,9 @@ class _HomeScreenState extends State<HomeScreen> {
         overflow: TextOverflow.ellipsis,
       ),
     );
+  }
+
+  Widget _buildEmptyState() {
+    return const SizedBox();
   }
 }

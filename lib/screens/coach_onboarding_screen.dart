@@ -844,12 +844,16 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    char,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.black : Colors.white,
+                  Expanded(
+                    child: Text(
+                      char,
+                      style: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? Colors.black : Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
                   if (isSelected)
@@ -924,6 +928,8 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                   color: isSelected ? Colors.black : Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ],
           ),

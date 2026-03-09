@@ -161,139 +161,149 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
 
           SafeArea(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(
                 horizontal: 24.0,
                 vertical: 20,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Geri Dön Butonu
-                  // Geri Dön Butonu
-                  ScaleButton(
-                    onPressed: () {
-                      // Geçmişi temizle ve Karşılama Ekranına zorla yönlendir
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const WelcomeScreen(), // Kendi ekranının adını buraya yaz
-                        ),
-                        (route) => false,
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // Başlık
-                  Text(
-                    "Tekrar\nHoşgeldin.",
-                    style: GoogleFonts.poppins(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    "Kaldığın yerden devam et.",
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      color: Colors.white70,
-                    ),
-                  ),
-
-                  const SizedBox(height: 50),
-
-                  // Inputlar
-                  CustomTextField(
-                    label: "E-posta Adresi",
-                    icon: Icons.email_outlined,
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  CustomTextField(
-                    label: "Şifre",
-                    icon: Icons.lock_outline,
-                    isPassword: true,
-                    controller: _passwordController,
-                  ),
-
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {
-                        /* Şifremi unuttum */
-                      },
-                      child: Text(
-                        "Şifremi Unuttum?",
-                        style: GoogleFonts.poppins(
-                          color: Colors.white70,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  // Giriş Butonu (Loading Kontrollü)
-                  _isLoading
-                      ? const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
-                        )
-                      : CustomButton(text: "Giriş Yap", onPressed: _login),
-
-                  const SizedBox(height: 20),
-
-                  Row(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight:
+                      MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      MediaQuery.of(context).padding.bottom -
+                      40,
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Expanded(child: Divider(color: Colors.white24)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        child: Text(
-                          "veya şununla devam et",
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.white38,
+                      // Geri Dön Butonu
+                      ScaleButton(
+                        onPressed: () {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const WelcomeScreen(),
+                            ),
+                            (route) => false,
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.2),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new,
+                            color: Colors.white,
+                            size: 20,
                           ),
                         ),
                       ),
-                      const Expanded(child: Divider(color: Colors.white24)),
+
+                      const SizedBox(height: 40),
+
+                      // Başlık
+                      Text(
+                        "Tekrar\nHoşgeldin.",
+                        style: GoogleFonts.poppins(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        "Kaldığın yerden devam et.",
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          color: Colors.white70,
+                        ),
+                      ),
+
+                      const SizedBox(height: 50),
+
+                      // Inputlar
+                      CustomTextField(
+                        label: "E-posta Adresi",
+                        icon: Icons.email_outlined,
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      CustomTextField(
+                        label: "Şifre",
+                        icon: Icons.lock_outline,
+                        isPassword: true,
+                        controller: _passwordController,
+                      ),
+
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {
+                            /* Şifremi unuttum */
+                          },
+                          child: Text(
+                            "Şifremi Unuttum?",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // Giriş Butonu (Loading Kontrollü)
+                      _isLoading
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                              ),
+                            )
+                          : CustomButton(text: "Giriş Yap", onPressed: _login),
+
+                      const SizedBox(height: 20),
+
+                      Row(
+                        children: [
+                          const Expanded(child: Divider(color: Colors.white24)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              "veya şununla devam et",
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: Colors.white38,
+                              ),
+                            ),
+                          ),
+                          const Expanded(child: Divider(color: Colors.white24)),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // GOOGLE BUTONU
+                      SocialLoginButton(
+                        text: "Google ile Giriş Yap",
+                        iconPath: 'assets/icons/google.png',
+                        onPressed: _loginWithGoogle,
+                      ),
                     ],
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // GOOGLE BUTONU (Yeni eklendi, dosyada import ettiğinden emin ol)
-                  SocialLoginButton(
-                    text: "Google ile Giriş Yap",
-                    iconPath: 'assets/icons/google.png',
-                    onPressed: _loginWithGoogle,
-                  ),
-                ],
+                ),
               ),
             ),
           ),

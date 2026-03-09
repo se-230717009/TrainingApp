@@ -40,10 +40,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   late RtcEngine _engine;
   late String _channelName;
 
+  // --- YENİ: ARAYÜZ (UI) VE SÜRÜKLEME DEĞİŞKENLERİ ---
+  bool _showControls = true; // Ekrana dokununca menüleri gizlemek için
+  double? _pipTop; // Küçük ekranın Y ekseni
+  double? _pipLeft; // Küçük ekranın X ekseni
+
   @override
   void initState() {
     super.initState();
-    // Agora kanal isimlerinde boşluk ve Türkçe karakter pek sevilmez, o yüzden temizliyoruz
     _channelName = widget.roomName
         .replaceAll(' ', '_')
         .replaceAll('ı', 'i')
@@ -53,15 +57,12 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         .replaceAll('ü', 'u')
         .replaceAll('ö', 'o');
 
-    // Motoru başlat
     initAgora();
   }
 
   Future<void> initAgora() async {
-    // 1. İzinleri İste
     await [Permission.microphone, Permission.camera].request();
 
-    // 2. Motoru Oluştur
     _engine = createAgoraRtcEngine();
     await _engine.initialize(
       const RtcEngineContext(
@@ -72,25 +73,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     await _engine.enableVideo();
 
-    // 3. Olay Dinleyicileri (Event Handlers)
     _engine.registerEventHandler(
       RtcEngineEventHandler(
-        // Biz odaya başarıyla girdiğimizde
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
           debugPrint("Odya girildi: ${connection.channelId}");
           setState(() {
             _localUserJoined = true;
           });
         },
-        // Karşı taraf (Öğrenci/Hoca) odaya girdiğinde
         onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
           debugPrint("Karşı taraf geldi: $remoteUid");
           setState(() {
-            _remoteUid = remoteUid; // Karşı tarafın ID'sini kaydet
+            _remoteUid = remoteUid;
           });
-          _startTimer(); // DERS BAŞLADI! KRONOMETREYİ ÇALIŞTIR!
+          _startTimer();
         },
-        // Karşı taraf odadan çıktığında veya bağlantısı koptuğunda
         onUserOffline:
             (
               RtcConnection connection,
@@ -101,27 +98,22 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               setState(() {
                 _remoteUid = null;
               });
-              _timer?.cancel(); // Süreyi durdur
+              _timer?.cancel();
             },
-        // Karşı taraf kendi kamerasını kapatır/açarsa
-        onRemoteVideoStateChanged: (connection, remoteUid, state, reason, elapsed) {
-          // İleride buraya "Karşı taraf kamerasını kapattı" ui güncellemesi eklenebilir
-        },
       ),
     );
 
-    // 4. Odaya Gir
     await _engine.startPreview();
     await _engine.joinChannel(
       token: token,
       channelId: _channelName,
-      uid: 0, // 0 verirsek Agora bize rastgele bir ID atar
+      uid: 0,
       options: const ChannelMediaOptions(),
     );
   }
 
   void _startTimer() {
-    _timer?.cancel(); // Varsa eskisini iptal et
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         _secondsElapsed++;
@@ -148,13 +140,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   void _endCall() {
-    Navigator.pop(
-      context,
-      true,
-    ); // true = Ders bitti sinyali (Değerlendirme ekranı için)
+    Navigator.pop(context, true);
   }
 
-  // Kamera açma/kapatma fonksiyonu
   void _toggleCamera() {
     setState(() {
       _isCameraOff = !_isCameraOff;
@@ -162,7 +150,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _engine.muteLocalVideoStream(_isCameraOff);
   }
 
-  // Mikrofon açma/kapatma fonksiyonu
   void _toggleMic() {
     setState(() {
       _isMicMuted = !_isMicMuted;
@@ -173,182 +160,221 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   @override
   Widget build(BuildContext context) {
     bool isRemoteUserJoined = _remoteUid != null;
+    final size = MediaQuery.of(context).size;
+    final safePadding = MediaQuery.of(context).padding;
+
+    // Küçük ekranın başlangıç pozisyonunu belirliyoruz (İlk açılışta sağ üstte)
+    if (_pipTop == null || _pipLeft == null) {
+      _pipTop = safePadding.top + 70;
+      _pipLeft = size.width - 110 - 20; // 110 genişlik, 20 boşluk
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           // ----------------------------------------------------------------
-          // 1. ARKA PLAN: EĞER KARŞISI YOKSA SENİN KAMERAN, VARSA ONUN KAMERASI
+          // 1. ARKA PLAN: TIKLANDIĞINDA UI'I GİZLER/GÖSTERİR
           // ----------------------------------------------------------------
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: const Color(0xFF121212),
-            child: isRemoteUserJoined
-                ? _buildRemoteVideo() // Karşı taraf geldiğinde onu tam ekran yap
-                : _buildLocalVideo(
-                    isFullScreen: true,
-                  ), // Sen tek başınayken kendini tam ekran yap
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _showControls = !_showControls; // Menüleri aç/kapat
+              });
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: const Color(0xFF121212),
+              child: isRemoteUserJoined
+                  ? _buildRemoteVideo()
+                  : _buildLocalVideo(isFullScreen: true),
+            ),
           ),
 
           // ----------------------------------------------------------------
-          // 2. BEKLEME EKRANI YAZILARI (Sadece tek başınayken)
+          // 2. BEKLEME EKRANI YAZILARI
           // ----------------------------------------------------------------
           if (!isRemoteUserJoined)
             Positioned.fill(
-              child: Container(
-                color: Colors.black.withOpacity(
-                  0.6,
-                ), // Kameranın üstüne hafif siyah perde
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const CircularProgressIndicator(
-                      color: ColorConstants.primaryColor,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      "Odada teksiniz",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+              child: IgnorePointer(
+                child: Container(
+                  color: Colors.black.withOpacity(0.6),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(
+                        color: ColorConstants.primaryColor,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "${widget.remoteUserName} bekleniyor...",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white70,
-                        fontSize: 16,
+                      const SizedBox(height: 24),
+                      Text(
+                        "Odada teksiniz",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        "${widget.remoteUserName} bekleniyor...",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
 
           // ----------------------------------------------------------------
-          // 3. KÜÇÜK EKRAN (PiP): SADECE KARŞI TARAF GELDİĞİNDE GÖZÜKÜR
+          // 3. HAREKETLİ (DRAGGABLE) KÜÇÜK EKRAN (PiP)
           // ----------------------------------------------------------------
           if (isRemoteUserJoined)
             Positioned(
-              top: 120,
-              right: 20,
-              child: Container(
-                width: 110,
-                height: 160,
-                decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white24, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: _buildLocalVideo(isFullScreen: false),
+              top: _pipTop,
+              left: _pipLeft,
+              child: GestureDetector(
+                onPanUpdate: (details) {
+                  // Ekranda sürüklerken pozisyonu güncelle ve sınırları aşmasını engelle (clamp)
+                  setState(() {
+                    _pipTop = (_pipTop! + details.delta.dy).clamp(
+                      safePadding.top,
+                      size.height - 160 - safePadding.bottom,
+                    );
+                    _pipLeft = (_pipLeft! + details.delta.dx).clamp(
+                      0.0,
+                      size.width - 110,
+                    );
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(
+                    milliseconds: 100,
+                  ), // Akıcı bir his verir
+                  width: 110,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[900],
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white24, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: _buildLocalVideo(isFullScreen: false),
+                  ),
                 ),
               ),
             ),
 
           // ----------------------------------------------------------------
-          // 4. ÜST BİLGİ BARI (Oda Adı ve Süre)
+          // 4. ANİMASYONLU ÜST BİLGİ BARI
           // ----------------------------------------------------------------
-          Positioned(
-            top: 50,
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: _showControls
+                ? 50
+                : -100, // Menü kapalıysa ekranın dışına kayar
             left: 20,
             right: 20,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      ScaleButton(
-                        onPressed: _endCall,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            color: Colors.white,
-                            size: 16,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 300),
+              opacity: _showControls ? 1.0 : 0.0, // Saydamlaşarak kaybolur
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        ScaleButton(
+                          onPressed: _endCall,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.roomName,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            // Süre sadece görüşme başladığında gözükür
-                            if (isRemoteUserJoined)
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Colors.redAccent,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _formattedTime,
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            else
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                "Bekleniyor...",
+                                widget.roomName,
                                 style: GoogleFonts.poppins(
-                                  color: Colors.white54,
-                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
                                 ),
                               ),
-                          ],
+                              if (isRemoteUserJoined)
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.redAccent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _formattedTime,
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else
+                                Text(
+                                  "Bekleniyor...",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white54,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const Icon(
-                        Icons.lock_outline_rounded,
-                        color: ColorConstants.primaryColor,
-                        size: 20,
-                      ),
-                    ],
+                        const Icon(
+                          Icons.lock_outline_rounded,
+                          color: ColorConstants.primaryColor,
+                          size: 20,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -356,69 +382,75 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           ),
 
           // ----------------------------------------------------------------
-          // 5. ALT KONTROL BARI (Mikrofon, Kapatma, Kamera)
+          // 5. ANİMASYONLU ALT KONTROL BARI
           // ----------------------------------------------------------------
-          Positioned(
-            bottom: 40,
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            bottom: _showControls ? 40 : -120, // Aşağı kayarak çıkar
             left: 30,
             right: 30,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 16,
-                    horizontal: 24,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.4),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildControlButton(
-                        icon: _isMicMuted
-                            ? Icons.mic_off_rounded
-                            : Icons.mic_rounded,
-                        isActive: !_isMicMuted,
-                        onTap: _toggleMic,
-                      ),
-                      ScaleButton(
-                        onPressed: _endCall,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.redAccent.withOpacity(0.4),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.call_end_rounded,
-                            color: Colors.white,
-                            size: 28,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 300),
+              opacity: _showControls ? 1.0 : 0.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 24,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildControlButton(
+                          icon: _isMicMuted
+                              ? Icons.mic_off_rounded
+                              : Icons.mic_rounded,
+                          isActive: !_isMicMuted,
+                          onTap: _toggleMic,
+                        ),
+                        ScaleButton(
+                          onPressed: _endCall,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.redAccent.withOpacity(0.4),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.call_end_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
                           ),
                         ),
-                      ),
-                      _buildControlButton(
-                        icon: _isCameraOff
-                            ? Icons.videocam_off_rounded
-                            : Icons.videocam_rounded,
-                        isActive: !_isCameraOff,
-                        onTap: _toggleCamera,
-                      ),
-                    ],
+                        _buildControlButton(
+                          icon: _isCameraOff
+                              ? Icons.videocam_off_rounded
+                              : Icons.videocam_rounded,
+                          isActive: !_isCameraOff,
+                          onTap: _toggleCamera,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -430,8 +462,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   // --- GERÇEK KAMERA GÖRÜNTÜLERİ ---
-
-  // Benim Kameram
   Widget _buildLocalVideo({required bool isFullScreen}) {
     if (_isCameraOff) {
       return Center(
@@ -455,14 +485,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       );
     }
 
-    // Motor başladıysa gerçek kamerayı göster
     if (_localUserJoined) {
       return AgoraVideoView(
         controller: VideoViewController(
           rtcEngine: _engine,
-          canvas: const VideoCanvas(
-            uid: 0,
-          ), // 0 her zaman yerel (kendi) kamerandır
+          canvas: const VideoCanvas(uid: 0),
         ),
       );
     } else {
@@ -472,7 +499,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  // Karşı Tarafın Kamerası
   Widget _buildRemoteVideo() {
     if (_remoteUid != null) {
       return AgoraVideoView(

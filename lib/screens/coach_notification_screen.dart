@@ -151,11 +151,15 @@ class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
                           size: 16,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          "${lessonData['day']} • ${lessonData['hour']}",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 13,
+                        Flexible(
+                          child: Text(
+                            "${lessonData['day']} • ${lessonData['hour']}",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ],
@@ -169,11 +173,15 @@ class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
                           size: 16,
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          "${lessonData['sport']} Dersi",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 13,
+                        Flexible(
+                          child: Text(
+                            "${lessonData['sport']} Dersi",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ],

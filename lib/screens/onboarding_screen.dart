@@ -238,12 +238,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           size: 20,
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          "Ortalama Saatlik Ücret: $_minPrice ₺ - $_maxPrice ₺",
-                          style: GoogleFonts.poppins(
-                            color: ColorConstants.primaryColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                        Flexible(
+                          child: Text(
+                            "Ortalama Saatlik Ücret: $_minPrice ₺ - $_maxPrice ₺",
+                            style: GoogleFonts.poppins(
+                              color: ColorConstants.primaryColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ],
@@ -385,6 +389,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             icon: Icons.people_alt_outlined,
             isSelected: _coachingType == "Birebir (Yüzyüze)",
             onTap: () => setState(() => _coachingType = "Birebir (Yüzyüze)"),
+          ),
+          _buildSelectableCardWithIcon(
+            text: "Farketmez",
+            subtext: "Hem online hem yüzyüze çalışabilirim.",
+            icon: Icons.compare_arrows_rounded,
+            isSelected: _coachingType == "Farketmez",
+            onTap: () => setState(() => _coachingType = "Farketmez"),
           ),
         ],
       ),

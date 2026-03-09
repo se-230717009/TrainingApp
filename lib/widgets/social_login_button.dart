@@ -33,12 +33,16 @@ class SocialLoginButton extends StatelessWidget {
             // Logo (Asset olarak eklemen gerekecek)
             Image.asset(iconPath, height: 24, width: 24),
             const SizedBox(width: 12),
-            Text(
-              text,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+            Flexible(
+              child: Text(
+                text,
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
           ],
