@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/constants/color_constants.dart';
-import '../screens/welcome_screen.dart'; // Eğer uygulaman ilk Welcome'dan başlıyorsa
 import '../screens/home_screen.dart';
 import '../screens/coach_home_screen.dart';
 import '../screens/onboarding_screen.dart';
@@ -11,24 +10,12 @@ import '../screens/coach_onboarding_screen.dart';
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
-  Future<Map<String, dynamic>> _getUserData(String uid) async {
-    final AuthService authService = AuthService();
-    bool isOnboarded = await authService.checkOnboardingStatus(uid);
-    String? userType = await authService.getUserType(uid);
-
-    return {
-      'isOnboarded': isOnboarded,
-      'userType': userType ?? 'athlete', // Varsayılan athlete
-    };
-  }
-
   @override
   Widget build(BuildContext context) {
-    // 1. Firebase'de aktif bir oturum var mı diye dinliyoruz
+    // 1. Firebase'de aktif bir oturum var mı diye dinleniyor
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Firebase henüz kontrol ediyorsa siyah bir ekranda loading göster
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Colors.black,
@@ -40,16 +27,19 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // 2. Kullanıcı çıkış yapmışsa veya hiç girmemişse doğrudan Login/Welcome'a at
+        // 2. Kullanıcı çıkış yapmışsa veya hiç girmemişse Welcome ekranına yönlendir
+        // 2. Kullanıcı çıkış yapmışsa veya hiç girmemişse Ana Ekrana (Misafir) yönlendir
         if (!snapshot.hasData || snapshot.data == null) {
-          return const WelcomeScreen(); // Kendi başlangıç ekranın neyse onu yaz
+          return const HomeScreen();
         }
 
-        // 3. Kullanıcı giriş yapmış, şimdi rolünü ve form (onboarding) durumunu öğrenelim
-        return FutureBuilder<Map<String, dynamic>>(
-          future: _getUserData(snapshot.data!.uid),
+        // 3. Kullanıcı oturum açmış. Firestore'dan doğrudan rol ve form durumunu çek.
+        return FutureBuilder<DocumentSnapshot>(
+          future: FirebaseFirestore.instance
+              .collection('users')
+              .doc(snapshot.data!.uid)
+              .get(),
           builder: (context, userSnapshot) {
-            // Veritabanından rolü çekene kadar loading
             if (userSnapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(
                 backgroundColor: Colors.black,
@@ -61,20 +51,24 @@ class AuthWrapper extends StatelessWidget {
               );
             }
 
-            if (userSnapshot.hasError || !userSnapshot.hasData) {
-              return const WelcomeScreen(); // Hata olursa güvenli limana dön
+            if (userSnapshot.hasError ||
+                !userSnapshot.hasData ||
+                !userSnapshot.data!.exists) {
+              // Veritabanında belge yoksa yeni kullanıcıdır, standart Onboarding'e yönlendir.
+              return const OnboardingScreen();
             }
 
-            final userData = userSnapshot.data!;
+            final userData = userSnapshot.data!.data() as Map<String, dynamic>;
             final bool isCoach = userData['userType'] == 'coach';
-            final bool isOnboarded = userData['isOnboarded'] == true;
 
-            // 4. BÜYÜK YÖNLENDİRME (Vibe Routing)
-            if (isOnboarded) {
-              // Formu doldurmuş, direkt ana ekrana at
+            // Onboarding ekranlarında kaydedilen doğru anahtar kontrol ediliyor.
+            final bool isOnboardingCompleted =
+                userData['isOnboardingCompleted'] == true;
+
+            // 4. Duruma göre yönlendirme
+            if (isOnboardingCompleted) {
               return isCoach ? const CoachHomeScreen() : const HomeScreen();
             } else {
-              // Formu eksik kalmış, kaldığı yerden formu doldurtsun
               return isCoach
                   ? const CoachOnboardingScreen()
                   : const OnboardingScreen();

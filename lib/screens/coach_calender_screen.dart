@@ -8,10 +8,11 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/scale_button.dart';
-import 'chat_screen.dart';
-import 'video_call_screen.dart';
 import '../widgets/gradient_background.dart';
 
+// ============================================================================
+// 1. ANA TAKVİM EKRANI (CoachCalendarScreen)
+// ============================================================================
 class CoachCalendarScreen extends StatefulWidget {
   const CoachCalendarScreen({super.key});
 
@@ -24,7 +25,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
   DateTime? _selectedDay;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // --- VERİLERİN TUTULACAĞI LİSTELER (Takvimdeki noktalar için) ---
   List<Map<String, dynamic>> _lessons = [];
   List<Map<String, dynamic>> _activities = [];
   List<Map<String, dynamic>> _routines = [];
@@ -43,18 +43,15 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
 
   void _setupStreams() {
     final String uid = _auth.currentUser!.uid;
-
     _lessonsSub = FirebaseFirestore.instance
         .collection('lessons')
         .where('coachId', isEqualTo: uid)
         .where('status', isEqualTo: 'approved')
         .snapshots()
         .listen((snap) {
-          if (mounted) {
+          if (mounted)
             setState(() => _lessons = snap.docs.map((d) => d.data()).toList());
-          }
         });
-
     _activitiesSub = FirebaseFirestore.instance
         .collection('coach_manual_activities')
         .where('coachId', isEqualTo: uid)
@@ -65,7 +62,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
               () => _activities = snap.docs.map((d) => d.data()).toList(),
             );
         });
-
     _routinesSub = FirebaseFirestore.instance
         .collection('coach_routines')
         .where('coachId', isEqualTo: uid)
@@ -105,8 +101,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
     }
   }
 
-  // --- TAKVİMDEKİ NOKTALARI BELİRLEYEN FONKSİYON ---
-  // --- TAKVİMDEKİ RENKLİ NOKTALARI BELİRLEYEN FONKSİYON ---
   List<dynamic> _getEventsForDay(DateTime day) {
     String dayName = _getWeekdayString(day.weekday);
     String dateStr = DateFormat('yyyy-MM-dd').format(day);
@@ -120,9 +114,7 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
               (r['days'] as List).contains(dayName) &&
               (r['isUnavailable'] == true),
         );
-
     bool hasLesson = _lessons.any((l) => (l['days'] as List).contains(dayName));
-
     bool hasOther =
         _activities.any(
           (a) => a['date'] == dateStr && (a['isUnavailable'] != true),
@@ -137,750 +129,7 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
     if (hasBusy) events.add('busy');
     if (hasLesson) events.add('lesson');
     if (hasOther) events.add('other');
-
     return events;
-  }
-
-  void _showLessonDetails(Map<String, dynamic> lesson) {
-    String type = lesson['lessonType'] ?? 'Online';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[700],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    "Ders Detayı",
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Colors.white10,
-                          backgroundImage: lesson['athleteImage'] != null
-                              ? NetworkImage(lesson['athleteImage'])
-                              : null,
-                          child: lesson['athleteImage'] == null
-                              ? const Icon(Icons.person, color: Colors.white54)
-                              : null,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                lesson['athleteName'],
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                "Öğrenci",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white54,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatScreen(
-                                  receiverId: lesson['athleteId'],
-                                  receiverName: lesson['athleteName'],
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            color: ColorConstants.primaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildInfoCard(
-                          Icons.access_time_rounded,
-                          "Saatler",
-                          (lesson['hours'] as List).join('\n'),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildInfoCard(
-                          Icons.sports_gymnastics_rounded,
-                          "Branş / Tip",
-                          "${lesson['sport']}\n$type",
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  if (type == 'Online') ...[
-                    ScaleButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => VideoCallScreen(
-                              roomName: "${lesson['sport']} Dersi",
-                              remoteUserName:
-                                  lesson['athleteName'] ?? "Öğrenci",
-                            ),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: ColorConstants.primaryColor,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.play_circle_fill_rounded,
-                              color: Colors.black,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              "Dersi Başlat",
-                              style: GoogleFonts.poppins(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Text(
-                        "Oda ders saatinden 10 dk önce açılır.",
-                        style: GoogleFonts.poppins(
-                          color: Colors.white30,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                  ] else ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                        horizontal: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.directions_run_rounded,
-                            color: Colors.white54,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "Yüzyüze Antrenman",
-                            style: GoogleFonts.poppins(
-                              color: Colors.white54,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildInfoCard(IconData icon, String title, String value) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: ColorConstants.primaryColor, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- TEKİL AKTİVİTE EKLEME MODAL ---
-  void _showAddActivityModal() {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    final hourController = TextEditingController();
-    bool isSubmitting = false;
-    bool isUnavailable = false; // YENİ: MEŞGUL İŞARETİ
-    final selectedDate = _selectedDay ?? DateTime.now();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[700],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      "Tekil Aktivite Ekle",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      DateFormat(
-                        'd MMMM yyyy, EEEE',
-                        'tr_TR',
-                      ).format(selectedDate),
-                      style: GoogleFonts.poppins(
-                        color: ColorConstants.primaryColor,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _activityTextField(titleController, "Başlık (zorunlu)"),
-                    const SizedBox(height: 12),
-                    _activityTextField(
-                      hourController,
-                      "Saat (örn: 10:00 - Boş bırakılabilir)",
-                    ),
-                    const SizedBox(height: 12),
-
-                    // --- YENİ EKLENEN ŞIK MEŞGUL BUTONU ---
-                    GestureDetector(
-                      onTap: () =>
-                          setModalState(() => isUnavailable = !isUnavailable),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isUnavailable
-                              ? Colors.redAccent.withOpacity(0.1)
-                              : Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isUnavailable
-                                ? Colors.redAccent.withOpacity(0.5)
-                                : Colors.white10,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.block_rounded,
-                              color: isUnavailable
-                                  ? Colors.redAccent
-                                  : Colors.white54,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Dolu olarak işaretle",
-                                    style: GoogleFonts.poppins(
-                                      color: isUnavailable
-                                          ? Colors.redAccent
-                                          : Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  Text(
-                                    "Öğrenciler bu saate/güne ders alamaz.",
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white54,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch(
-                              value: isUnavailable,
-                              onChanged: (v) =>
-                                  setModalState(() => isUnavailable = v),
-                              activeColor: Colors.redAccent,
-                              inactiveTrackColor: Colors.white10,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _activityTextField(
-                      descController,
-                      "Açıklama (isteğe bağlı)",
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 24),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed:
-                            (isSubmitting ||
-                                titleController.text.trim().isEmpty)
-                            ? null
-                            : () async {
-                                setModalState(() => isSubmitting = true);
-                                await FirebaseFirestore.instance
-                                    .collection('coach_manual_activities')
-                                    .add({
-                                      'coachId': _auth.currentUser!.uid,
-                                      'date': DateFormat(
-                                        'yyyy-MM-dd',
-                                      ).format(selectedDate),
-                                      'title': titleController.text.trim(),
-                                      'description': descController.text.trim(),
-                                      'hour': hourController.text.trim(),
-                                      'isUnavailable':
-                                          isUnavailable, // YENİ VERİ TABANI ALANI
-                                      'createdAt': FieldValue.serverTimestamp(),
-                                    });
-                                if (mounted) {
-                                  Navigator.pop(ctx);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        "Aktivite eklendi!",
-                                        style: GoogleFonts.poppins(),
-                                      ),
-                                      backgroundColor: Colors.orange,
-                                    ),
-                                  );
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          disabledBackgroundColor: Colors.white10,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: isSubmitting
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.black,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                "Aktiviteyi Kaydet",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // --- HAFTALIK RUTİN EKLEME MODAL ---
-  void _showAddRoutineModal() {
-    final titleController = TextEditingController();
-    final descController = TextEditingController();
-    final hourController = TextEditingController();
-    bool isSubmitting = false;
-    bool isUnavailable = false; // YENİ: MEŞGUL İŞARETİ
-    List<String> selectedDays = [];
-    final List<String> daysList = [
-      "Pazartesi",
-      "Salı",
-      "Çarşamba",
-      "Perşembe",
-      "Cuma",
-      "Cumartesi",
-      "Pazar",
-    ];
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[700],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      "Haftalık Rutin Ekle",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Hangi günler tekrarlanacak?",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: daysList.map((day) {
-                        final isSelected = selectedDays.contains(day);
-                        return ChoiceChip(
-                          label: Text(day),
-                          selected: isSelected,
-                          selectedColor: Colors.blueAccent,
-                          backgroundColor: Colors.white,
-                          labelStyle: GoogleFonts.poppins(
-                            color: isSelected
-                                ? Colors.white
-                                : Colors.black, // Yazı simsiyah oldu
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.w600,
-                          ),
-                          onSelected: (val) {
-                            setModalState(() {
-                              if (val)
-                                selectedDays.add(day);
-                              else
-                                selectedDays.remove(day);
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 20),
-                    _activityTextField(titleController, "Başlık (zorunlu)"),
-                    const SizedBox(height: 12),
-                    _activityTextField(
-                      hourController,
-                      "Saat (örn: 10:00 - Boş bırakılabilir)",
-                    ),
-                    const SizedBox(height: 12),
-
-                    // --- YENİ EKLENEN ŞIK MEŞGUL BUTONU ---
-                    GestureDetector(
-                      onTap: () =>
-                          setModalState(() => isUnavailable = !isUnavailable),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isUnavailable
-                              ? Colors.redAccent.withOpacity(0.1)
-                              : Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isUnavailable
-                                ? Colors.redAccent.withOpacity(0.5)
-                                : Colors.white10,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.block_rounded,
-                              color: isUnavailable
-                                  ? Colors.redAccent
-                                  : Colors.white54,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Zamanı Kapat (Dolu)",
-                                    style: GoogleFonts.poppins(
-                                      color: isUnavailable
-                                          ? Colors.redAccent
-                                          : Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  Text(
-                                    "Öğrenciler rutin günlerinde ders alamaz.",
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white54,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch(
-                              value: isUnavailable,
-                              onChanged: (v) =>
-                                  setModalState(() => isUnavailable = v),
-                              activeColor: Colors.redAccent,
-                              inactiveTrackColor: Colors.white10,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _activityTextField(
-                      descController,
-                      "Açıklama (isteğe bağlı)",
-                      maxLines: 3,
-                    ),
-                    const SizedBox(height: 24),
-
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed:
-                            (isSubmitting ||
-                                titleController.text.trim().isEmpty ||
-                                selectedDays.isEmpty)
-                            ? null
-                            : () async {
-                                setModalState(() => isSubmitting = true);
-                                await FirebaseFirestore.instance
-                                    .collection('coach_routines')
-                                    .add({
-                                      'coachId': _auth.currentUser!.uid,
-                                      'days': selectedDays,
-                                      'title': titleController.text.trim(),
-                                      'description': descController.text.trim(),
-                                      'hour': hourController.text.trim(),
-                                      'isUnavailable':
-                                          isUnavailable, // YENİ VERİ TABANI ALANI
-                                      'createdAt': FieldValue.serverTimestamp(),
-                                    });
-                                if (mounted) {
-                                  Navigator.pop(ctx);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        "Rutin eklendi!",
-                                        style: GoogleFonts.poppins(),
-                                      ),
-                                      backgroundColor: Colors.blueAccent,
-                                    ),
-                                  );
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          disabledBackgroundColor: Colors.white10,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: isSubmitting
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                "Rutini Kaydet",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _activityTextField(
-    TextEditingController ctrl,
-    String hint, {
-    int maxLines = 1,
-  }) {
-    return TextField(
-      controller: ctrl,
-      maxLines: maxLines,
-      style: GoogleFonts.poppins(color: Colors.white),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: GoogleFonts.poppins(color: Colors.white38),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      ),
-    );
   }
 
   @override
@@ -888,114 +137,77 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        extendBodyBehindAppBar: true, // PANELİM İLE AYNI YAPI
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.black.withOpacity(0.6), // ŞEFFAF SİYAH
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
+          automaticallyImplyLeading: false, // GERİ TUŞU KALDIRILDI
           title: Text(
             "Takvimim",
             style: GoogleFonts.poppins(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
 
-        floatingActionButton: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            ScaleButton(
-              onPressed: _showAddRoutineModal,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.blueAccent,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blueAccent.withOpacity(0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+        floatingActionButton: _selectedDay != null
+            ? ScaleButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          CoachDayDetailsScreen(selectedDate: _selectedDay!),
                     ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.repeat_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "Rutin Ekle",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ColorConstants.primaryColor,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: ColorConstants.primaryColor.withOpacity(0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            ScaleButton(
-              onPressed: _showAddActivityModal,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.orange.withOpacity(0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.event_note_rounded,
-                      color: Colors.black,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "Aktivite Ekle",
-                      style: GoogleFonts.poppins(
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.view_day_rounded,
                         color: Colors.black,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
+                        size: 22,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        "Gün Detayları",
+                        style: GoogleFonts.poppins(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-          ],
-        ),
+              )
+            : null,
 
         body: Column(
           children: [
+            // APPBAR ALTINDA EZİLMEMESİ İÇİN DİNAMİK BOŞLUK
+            SizedBox(
+              height: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+            ),
             Container(
               margin: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1015,7 +227,7 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                     _focusedDay = focusedDay;
                   });
                 },
-                eventLoader: _getEventsForDay, // YENİ: Anlık nokta okuyucu
+                eventLoader: _getEventsForDay,
                 startingDayOfWeek: StartingDayOfWeek.monday,
                 calendarBuilders: CalendarBuilders(
                   markerBuilder: (context, day, events) {
@@ -1025,14 +237,10 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: events.map((event) {
-                          Color dotColor =
-                              Colors.orange; // Default: Aktiviteler (Turuncu)
-                          if (event == 'busy')
-                            dotColor = Colors.redAccent; // Meşgul (Kırmızı)
+                          Color dotColor = Colors.orange;
+                          if (event == 'busy') dotColor = Colors.redAccent;
                           if (event == 'lesson')
-                            dotColor =
-                                ColorConstants.primaryColor; // Ders (Yeşil)
-
+                            dotColor = ColorConstants.primaryColor;
                           return Container(
                             margin: const EdgeInsets.symmetric(horizontal: 1.5),
                             width: 6,
@@ -1091,251 +299,1034 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
             if (_selectedDay != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.date_range,
-                      color: ColorConstants.primaryColor,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      DateFormat(
-                        'd MMMM yyyy, EEEE',
-                        'tr_TR',
-                      ).format(_selectedDay!),
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+                      const Icon(
+                        Icons.touch_app_rounded,
+                        color: Colors.white24,
+                        size: 50,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      Text(
+                        "Saatlik planı görmek ve aktivite eklemek için\n'Gün Detayları' butonuna tıklayın.",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white54,
+                          fontSize: 13,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            Expanded(
-              child: _selectedDay == null
-                  ? Center(
-                      child: Text(
-                        "Dersleri görmek için bir gün seçin.",
-                        style: GoogleFonts.poppins(color: Colors.white54),
-                      ),
-                    )
-                  : _buildLessonListForDay(_selectedDay!),
-            ),
           ],
         ),
       ),
     );
   }
+}
 
-  // YENİ: StreamBuilder kullanmak yerine hafızadaki (initState'de çekilen) verileri anında yansıtıyoruz
-  Widget _buildLessonListForDay(DateTime day) {
-    String dayName = _getWeekdayString(day.weekday);
-    String dateStr = DateFormat('yyyy-MM-dd').format(day);
+// ============================================================================
+// 2. GÜNLÜK DETAY VE SAATLİK GÖRÜNÜM EKRANI (İÇ SAYFA)
+// ============================================================================
+class CoachDayDetailsScreen extends StatefulWidget {
+  final DateTime selectedDate;
+  const CoachDayDetailsScreen({super.key, required this.selectedDate});
 
-    final dayLessons = _lessons
-        .where((l) => (l['days'] as List).contains(dayName))
-        .toList();
-    final dayActivities = _activities
-        .where((a) => a['date'] == dateStr)
-        .toList();
-    final dayRoutines = _routines
-        .where((r) => (r['days'] as List).contains(dayName))
-        .toList();
+  @override
+  State<CoachDayDetailsScreen> createState() => _CoachDayDetailsScreenState();
+}
 
-    if (dayLessons.isEmpty && dayActivities.isEmpty && dayRoutines.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.event_busy_rounded,
-              color: Colors.white24,
-              size: 50,
+class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  List<Map<String, dynamic>> _lessons = [];
+  List<Map<String, dynamic>> _activities = [];
+  List<Map<String, dynamic>> _routines = [];
+  StreamSubscription? _lessonsSub, _activitiesSub, _routinesSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupStreams();
+  }
+
+  void _setupStreams() {
+    final String uid = _auth.currentUser!.uid;
+    String dayName = _getWeekdayString(widget.selectedDate.weekday);
+    String dateStr = DateFormat('yyyy-MM-dd').format(widget.selectedDate);
+
+    _lessonsSub = FirebaseFirestore.instance
+        .collection('lessons')
+        .where('coachId', isEqualTo: uid)
+        .where('status', isEqualTo: 'approved')
+        .where('days', arrayContains: dayName)
+        .snapshots()
+        .listen((snap) {
+          if (mounted)
+            setState(
+              () => _lessons = snap.docs
+                  .map((d) => <String, dynamic>{...d.data(), 'id': d.id})
+                  .toList(),
+            );
+        });
+    _activitiesSub = FirebaseFirestore.instance
+        .collection('coach_manual_activities')
+        .where('coachId', isEqualTo: uid)
+        .where('date', isEqualTo: dateStr)
+        .snapshots()
+        .listen((snap) {
+          if (mounted)
+            setState(
+              () => _activities = snap.docs
+                  .map((d) => <String, dynamic>{...d.data(), 'id': d.id})
+                  .toList(),
+            );
+        });
+    _routinesSub = FirebaseFirestore.instance
+        .collection('coach_routines')
+        .where('coachId', isEqualTo: uid)
+        .where('days', arrayContains: dayName)
+        .snapshots()
+        .listen((snap) {
+          if (mounted)
+            setState(
+              () => _routines = snap.docs
+                  .map((d) => <String, dynamic>{...d.data(), 'id': d.id})
+                  .toList(),
+            );
+        });
+  }
+
+  @override
+  void dispose() {
+    _lessonsSub?.cancel();
+    _activitiesSub?.cancel();
+    _routinesSub?.cancel();
+    super.dispose();
+  }
+
+  String _getWeekdayString(int weekday) {
+    switch (weekday) {
+      case 1:
+        return "Pazartesi";
+      case 2:
+        return "Salı";
+      case 3:
+        return "Çarşamba";
+      case 4:
+        return "Perşembe";
+      case 5:
+        return "Cuma";
+      case 6:
+        return "Cumartesi";
+      case 7:
+        return "Pazar";
+      default:
+        return "";
+    }
+  }
+
+  List<Map<String, dynamic>> _getEventsForHour(int hour) {
+    List<Map<String, dynamic>> events = [];
+    String hourStr = hour.toString().padLeft(2, '0');
+
+    for (var act in _activities) {
+      if (act['hour'] != null && act['hour'].toString().startsWith(hourStr))
+        events.add({...act, 'type': 'activity'});
+    }
+    for (var r in _routines) {
+      if (r['hour'] != null && r['hour'].toString().startsWith(hourStr))
+        events.add({...r, 'type': 'routine'});
+    }
+    for (var l in _lessons) {
+      List<dynamic> hours = l['hours'] ?? [];
+      for (String hRange in hours) {
+        if (hRange.startsWith(hourStr)) events.add({...l, 'type': 'lesson'});
+      }
+    }
+    return events;
+  }
+
+  void _showEventDetailsModal(Map<String, dynamic> event) {
+    bool isLesson = event['type'] == 'lesson';
+    bool isUnavail = event['isUnavailable'] == true;
+    String title = event['title'] ?? event['athleteName'] ?? 'Etkinlik';
+    String time =
+        event['hour'] ??
+        (event['hours'] != null ? (event['hours'] as List).join(', ') : '');
+    String desc =
+        event['description'] ??
+        (isLesson
+            ? "${event['sport']} Dersi"
+            : (isUnavail ? "Zaman Kapatıldı" : ""));
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[700],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.access_time_rounded,
+                      color: Colors.white54,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      time,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                if (desc.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    desc,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white54,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 30),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      String docId = event['id'];
+                      try {
+                        if (isLesson) {
+                          await FirebaseFirestore.instance
+                              .collection('lessons')
+                              .doc(docId)
+                              .update({'status': 'cancelled'});
+                        } else if (event['type'] == 'activity') {
+                          await FirebaseFirestore.instance
+                              .collection('coach_manual_activities')
+                              .doc(docId)
+                              .delete();
+                        } else if (event['type'] == 'routine') {
+                          await FirebaseFirestore.instance
+                              .collection('coach_routines')
+                              .doc(docId)
+                              .delete();
+                        }
+
+                        if (mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                isLesson
+                                    ? "Ders başarıyla iptal edildi."
+                                    : "Etkinlik başarıyla kaldırıldı.",
+                                style: GoogleFonts.poppins(),
+                              ),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              "Hata oluştu.",
+                              style: GoogleFonts.poppins(),
+                            ),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent.withOpacity(0.1),
+                      elevation: 0,
+                      side: BorderSide(
+                        color: Colors.redAccent.withOpacity(0.5),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      isLesson ? "Bu Dersi İptal Et" : "Bu Etkinliği Kaldır",
+                      style: GoogleFonts.poppins(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              "Bu tarihte etkinlik veya rutin bulunmuyor.",
-              style: GoogleFonts.poppins(color: Colors.white54),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAdvancedActivityModal() {
+    final titleController = TextEditingController();
+    final descController = TextEditingController();
+
+    String recurrenceType = 'Tek Seferlik';
+    String startTime = "09:00";
+    String endTime = "10:00";
+    List<String> selectedDays = [
+      _getWeekdayString(widget.selectedDate.weekday),
+    ];
+    bool isUnavailable = false;
+    DateTime? endDate;
+    bool isSubmitting = false;
+
+    final List<String> daysList = [
+      "Pazartesi",
+      "Salı",
+      "Çarşamba",
+      "Perşembe",
+      "Cuma",
+      "Cumartesi",
+      "Pazar",
+    ];
+    final List<String> timeList = List.generate(
+      24,
+      (i) => "${i.toString().padLeft(2, '0')}:00",
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[700],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Aktivite Ayarları",
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close, color: Colors.white54),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    _buildTextField(
+                      titleController,
+                      "Başlık (Örn: Özel Antrenman)",
+                    ),
+                    const SizedBox(height: 12),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDropdown(
+                            "Başlangıç",
+                            startTime,
+                            timeList,
+                            (v) => setModalState(() => startTime = v!),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildDropdown(
+                            "Bitiş",
+                            endTime,
+                            timeList,
+                            (v) => setModalState(() => endTime = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    const Divider(color: Colors.white10),
+                    const SizedBox(height: 12),
+
+                    Text(
+                      "Tekrar Modeli",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: ['Tek Seferlik', 'Haftalık'].map((type) {
+                        bool isSelected = recurrenceType == type;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: ChoiceChip(
+                            label: Text(type),
+                            selected: isSelected,
+                            selectedColor: ColorConstants.primaryColor,
+                            backgroundColor: Colors.white10,
+                            labelStyle: GoogleFonts.poppins(
+                              color: isSelected ? Colors.black : Colors.white,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                            onSelected: (val) =>
+                                setModalState(() => recurrenceType = type),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (recurrenceType == 'Haftalık') ...[
+                      Text(
+                        "Tekrar Günleri",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: daysList.map((day) {
+                          final isSelected = selectedDays.contains(day);
+                          return ChoiceChip(
+                            label: Text(day.substring(0, 3)),
+                            selected: isSelected,
+                            selectedColor: Colors.blueAccent,
+                            backgroundColor: Colors.white10,
+                            labelStyle: GoogleFonts.poppins(
+                              color: isSelected ? Colors.white : Colors.white70,
+                            ),
+                            onSelected: (val) => setModalState(() {
+                              val
+                                  ? selectedDays.add(day)
+                                  : selectedDays.remove(day);
+                            }),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Text(
+                        "Tekrar Bitiş Tarihi",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ScaleButton(
+                              onPressed: () async {
+                                final DateTime? picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: DateTime.now().add(
+                                    const Duration(days: 30),
+                                  ),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime(2030),
+                                  builder: (context, child) => Theme(
+                                    data: ThemeData.dark().copyWith(
+                                      colorScheme: const ColorScheme.dark(
+                                        primary: ColorConstants.primaryColor,
+                                        onPrimary: Colors.black,
+                                        surface: Color(0xFF1E1E1E),
+                                        onSurface: Colors.white,
+                                      ),
+                                    ),
+                                    child: child!,
+                                  ),
+                                );
+                                if (picked != null)
+                                  setModalState(() => endDate = picked);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                  horizontal: 16,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white10,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.date_range_rounded,
+                                      color: Colors.white54,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      endDate == null
+                                          ? "Tarih Seç"
+                                          : DateFormat(
+                                              'd MMM yyyy',
+                                              'tr_TR',
+                                            ).format(endDate!),
+                                      style: GoogleFonts.poppins(
+                                        color: endDate == null
+                                            ? Colors.white54
+                                            : Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: CheckboxListTile(
+                              title: Text(
+                                "Süresiz",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              value: endDate == null,
+                              activeColor: ColorConstants.primaryColor,
+                              checkColor: Colors.black,
+                              contentPadding: EdgeInsets.zero,
+                              onChanged: (val) => setModalState(
+                                () => endDate = val == true
+                                    ? null
+                                    : DateTime.now(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    const Divider(color: Colors.white10),
+                    const SizedBox(height: 12),
+
+                    GestureDetector(
+                      onTap: () =>
+                          setModalState(() => isUnavailable = !isUnavailable),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isUnavailable
+                              ? Colors.redAccent.withOpacity(0.1)
+                              : Colors.white.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isUnavailable
+                                ? Colors.redAccent.withOpacity(0.5)
+                                : Colors.white10,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.block_rounded,
+                              color: isUnavailable
+                                  ? Colors.redAccent
+                                  : Colors.white54,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "Zamanı Kapat (Meşgul)",
+                                    style: GoogleFonts.poppins(
+                                      color: isUnavailable
+                                          ? Colors.redAccent
+                                          : Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  Text(
+                                    "Öğrenciler bu saatlere ders alamaz.",
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white54,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: isUnavailable,
+                              onChanged: (v) =>
+                                  setModalState(() => isUnavailable = v),
+                              activeColor: Colors.redAccent,
+                              inactiveTrackColor: Colors.white10,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed:
+                            (isSubmitting ||
+                                titleController.text.trim().isEmpty)
+                            ? null
+                            : () async {
+                                setModalState(() => isSubmitting = true);
+                                try {
+                                  String formattedHour =
+                                      "$startTime - $endTime";
+                                  if (recurrenceType == 'Tek Seferlik') {
+                                    await FirebaseFirestore.instance
+                                        .collection('coach_manual_activities')
+                                        .add({
+                                          'coachId': _auth.currentUser!.uid,
+                                          'date': DateFormat(
+                                            'yyyy-MM-dd',
+                                          ).format(widget.selectedDate),
+                                          'title': titleController.text.trim(),
+                                          'description': descController.text
+                                              .trim(),
+                                          'hour': formattedHour,
+                                          'isUnavailable': isUnavailable,
+                                          'createdAt':
+                                              FieldValue.serverTimestamp(),
+                                        });
+                                  } else {
+                                    await FirebaseFirestore.instance
+                                        .collection('coach_routines')
+                                        .add({
+                                          'coachId': _auth.currentUser!.uid,
+                                          'days': selectedDays,
+                                          'title': titleController.text.trim(),
+                                          'description': descController.text
+                                              .trim(),
+                                          'hour': formattedHour,
+                                          'endDate': endDate != null
+                                              ? DateFormat(
+                                                  'yyyy-MM-dd',
+                                                ).format(endDate!)
+                                              : null,
+                                          'isUnavailable': isUnavailable,
+                                          'createdAt':
+                                              FieldValue.serverTimestamp(),
+                                        });
+                                  }
+                                  if (mounted) {
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          "Başarıyla kaydedildi!",
+                                          style: GoogleFonts.poppins(),
+                                        ),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        "Hata oluştu.",
+                                        style: GoogleFonts.poppins(),
+                                      ),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                } finally {
+                                  if (mounted)
+                                    setModalState(() => isSubmitting = false);
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: recurrenceType == 'Haftalık'
+                              ? Colors.blueAccent
+                              : Colors.orange,
+                          disabledBackgroundColor: Colors.white10,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: isSubmitting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                "Kaydet",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTextField(TextEditingController ctrl, String hint) {
+    return TextField(
+      controller: ctrl,
+      style: GoogleFonts.poppins(color: Colors.white),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.poppins(color: Colors.white38),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdown(
+    String label,
+    String value,
+    List<String> items,
+    Function(String?) onChanged,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              dropdownColor: const Color(0xFF1E1E1E),
+              icon: const Icon(
+                Icons.access_time_rounded,
+                color: Colors.white54,
+                size: 18,
+              ),
+              style: GoogleFonts.poppins(color: Colors.white),
+              items: items
+                  .map((i) => DropdownMenuItem(value: i, child: Text(i)))
+                  .toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GradientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Text(
+            "${widget.selectedDate.day} ${_getWeekdayString(widget.selectedDate.weekday)} Planı",
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: ScaleButton(
+                onPressed: _showAdvancedActivityModal,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.add_circle_outline_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Aktivite Ekle",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const Divider(color: Colors.white10),
+
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 40, top: 8),
+                itemCount: 24,
+                itemBuilder: (context, index) {
+                  String timeLabel = "${index.toString().padLeft(2, '0')}:00";
+                  List<Map<String, dynamic>> hourEvents = _getEventsForHour(
+                    index,
+                  );
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 55,
+                          child: Text(
+                            timeLabel,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white54,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              border: Border(
+                                top: BorderSide(color: Colors.white10),
+                              ),
+                            ),
+                            padding: const EdgeInsets.only(top: 8, left: 8),
+                            child: hourEvents.isEmpty
+                                ? const SizedBox(height: 40)
+                                : Column(
+                                    children: hourEvents.map((event) {
+                                      bool isUnavail =
+                                          event['isUnavailable'] == true;
+                                      Color cardColor =
+                                          event['type'] == 'lesson'
+                                          ? ColorConstants.primaryColor
+                                          : (isUnavail
+                                                ? Colors.redAccent
+                                                : Colors.orange);
+                                      if (event['type'] == 'routine' &&
+                                          !isUnavail)
+                                        cardColor = Colors.blueAccent;
+
+                                      return ScaleButton(
+                                        onPressed: () =>
+                                            _showEventDetailsModal(event),
+                                        child: Container(
+                                          margin: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: cardColor.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                            border: Border.all(
+                                              color: cardColor.withOpacity(0.5),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isUnavail
+                                                    ? Icons.block_rounded
+                                                    : (event['type'] == 'lesson'
+                                                          ? Icons
+                                                                .fitness_center_rounded
+                                                          : Icons
+                                                                .event_note_rounded),
+                                                color: cardColor,
+                                                size: 18,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      event['title'] ??
+                                                          event['athleteName'] ??
+                                                          'Etkinlik',
+                                                      style:
+                                                          GoogleFonts.poppins(
+                                                            color: cardColor,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontSize: 13,
+                                                          ),
+                                                    ),
+                                                    if (event['hour'] != null ||
+                                                        event['hours'] != null)
+                                                      Text(
+                                                        event['hour'] ??
+                                                            (event['hours']
+                                                                    as List)
+                                                                .join(', '),
+                                                        style:
+                                                            GoogleFonts.poppins(
+                                                              color: Colors
+                                                                  .white70,
+                                                              fontSize: 11,
+                                                            ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        // 1. Alınan Dersler
-        ...dayLessons.map((lesson) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              onTap: () => _showLessonDetails(lesson),
-              tileColor: Colors.white.withOpacity(0.05),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: ColorConstants.primaryColor.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.fitness_center_rounded,
-                  color: ColorConstants.primaryColor,
-                  size: 20,
-                ),
-              ),
-              title: Text(
-                lesson['athleteName'],
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              subtitle: Text(
-                "${(lesson['hours'] as List).join(', ')} • ${lesson['sport']}",
-                style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
-              ),
-              trailing: const Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: Colors.white24,
-                size: 14,
-              ),
-            ),
-          );
-        }),
-
-        // 2. Haftalık Rutinler
-        ...dayRoutines.map((routine) {
-          final bool isUnavail = routine['isUnavailable'] ?? false;
-          final Color tColor = isUnavail ? Colors.redAccent : Colors.blueAccent;
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              tileColor: tColor.withOpacity(0.06),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: tColor.withOpacity(0.25)),
-              ),
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: tColor.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isUnavail ? Icons.block_rounded : Icons.repeat_rounded,
-                  color: tColor,
-                  size: 20,
-                ),
-              ),
-              title: Text(
-                routine['title'] ?? 'Rutin',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              subtitle: Text(
-                [
-                  if ((routine['hour'] as String? ?? '').isNotEmpty)
-                    routine['hour'],
-                  if ((routine['description'] as String? ?? '').isNotEmpty)
-                    routine['description'],
-                ].join(' • '),
-                style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
-              ),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: tColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  isUnavail ? "Meşgul" : "Rutin",
-                  style: GoogleFonts.poppins(
-                    color: tColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-
-        // 3. Tekil Aktiviteler
-        ...dayActivities.map((act) {
-          final bool isUnavail = act['isUnavailable'] ?? false;
-          final Color tColor = isUnavail ? Colors.redAccent : Colors.orange;
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              tileColor: tColor.withOpacity(0.06),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: tColor.withOpacity(0.25)),
-              ),
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: tColor.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isUnavail ? Icons.block_rounded : Icons.event_note_rounded,
-                  color: tColor,
-                  size: 20,
-                ),
-              ),
-              title: Text(
-                act['title'] ?? 'Aktivite',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              subtitle: Text(
-                [
-                  if ((act['hour'] as String? ?? '').isNotEmpty) act['hour'],
-                  if ((act['description'] as String? ?? '').isNotEmpty)
-                    act['description'],
-                ].join(' • '),
-                style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
-              ),
-              trailing: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: tColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  isUnavail ? "Meşgul" : "Tekil",
-                  style: GoogleFonts.poppins(
-                    color: tColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ],
+      ),
     );
   }
 }

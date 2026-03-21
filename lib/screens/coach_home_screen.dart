@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
 import '../services/auth_service.dart';
 import '../widgets/scale_button.dart';
-import '../widgets/gradient_background.dart'; // YENİ EKLENDİ
+import '../widgets/gradient_background.dart';
 import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'coach_calender_screen.dart';
@@ -23,6 +23,9 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
   final AuthService _authService = AuthService();
   final String _uid = FirebaseAuth.instance.currentUser!.uid;
 
+  // --- ALT MENÜ DURUMU ---
+  int _selectedIndex = 0;
+
   void _signOut() async {
     await _authService.signOut();
     if (mounted) {
@@ -34,213 +37,102 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     }
   }
 
-  void _showSettingsModal() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+  // --- SEKMELER (TABS) ---
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          _buildDashboardTab(),
+          const CoachCalendarScreen(),
+          const CoachMessagesScreen(),
+          const EditProfileScreen(),
+          _buildSettingsTab(),
+        ],
       ),
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[700],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  "Hesap & Ayarlar",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _buildMenuItem(Icons.person_outline, "Profil Düzenle", () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EditProfileScreen(),
-                    ),
-                  );
-                }),
-                _buildMenuItem(
-                  Icons.settings_outlined,
-                  "Uygulama Ayarları",
-                  () {},
-                ),
-                _buildMenuItem(
-                  Icons.privacy_tip_outlined,
-                  "Gizlilik Politikası",
-                  () {},
-                ),
-                _buildMenuItem(Icons.help_outline, "Yardım & Destek", () {}),
-                const Divider(color: Colors.white10, height: 30),
-                _buildMenuItem(
-                  Icons.logout,
-                  "Çıkış Yap",
-                  _signOut,
-                  isDestructive: true,
-                ),
-              ],
-            ),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: Colors.white10, width: 1)),
+        ),
+        child: BottomNavigationBar(
+          backgroundColor: const Color(0xFF121212),
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: ColorConstants.primaryColor,
+          unselectedItemColor: Colors.white54,
+          showSelectedLabels: true,
+          showUnselectedLabels: true,
+          currentIndex: _selectedIndex,
+          onTap: (index) => setState(() => _selectedIndex = index),
+          selectedLabelStyle: GoogleFonts.poppins(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
           ),
-        );
-      },
+          unselectedLabelStyle: GoogleFonts.poppins(fontSize: 10),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_outlined),
+              activeIcon: Icon(Icons.dashboard),
+              label: "Panelim",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_month_outlined),
+              activeIcon: Icon(Icons.calendar_month),
+              label: "Takvim",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline),
+              activeIcon: Icon(Icons.chat_bubble),
+              label: "Mesajlar",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: "Profil",
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings),
+              label: "Ayarlar",
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
+  // --- SEKME 1: PANELİM ---
+  Widget _buildDashboardTab() {
     return GradientBackground(
-      // YENİ: MERKEZİ ARKA PLAN EKLENDİ
       child: Scaffold(
-        backgroundColor: Colors.transparent, // YENİ: TRANSPARAN YAPILDI
+        backgroundColor: Colors.transparent,
         extendBodyBehindAppBar: true,
         appBar: AppBar(
           backgroundColor: Colors.black.withOpacity(0.6),
           elevation: 0,
           automaticallyImplyLeading: false,
-          centerTitle: false,
-          titleSpacing: 24,
-          flexibleSpace: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFF1A1A1A), Colors.transparent],
-              ),
-            ),
-          ),
-          title: PopupMenuButton<String>(
-            color: const Color(0xFF1E1E1E),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            offset: const Offset(0, 45),
-            onSelected: (value) {
-              if (value == 'takvimim') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CoachCalendarScreen(),
-                  ),
-                );
-              } else if (value == 'mesajlarim') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CoachMessagesScreen(),
-                  ),
-                );
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'panelim',
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.dashboard_outlined,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      "Panelim",
-                      style: GoogleFonts.poppins(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'takvimim',
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_month_outlined,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      "Takvimim",
-                      style: GoogleFonts.poppins(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: 'mesajlarim',
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.chat_bubble_outline_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      "Mesajlarım",
-                      style: GoogleFonts.poppins(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "Panelim",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: Colors.white54,
-                  size: 24,
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: ColorConstants.primaryColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
+          title: Text(
+            "Panelim",
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
           ),
           actions: [
             ScaleButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CoachNotificationsScreen(),
-                  ),
-                );
-              },
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CoachNotificationsScreen(),
+                ),
+              ),
               child: Stack(
                 alignment: Alignment.topRight,
                 children: [
                   Container(
+                    margin: const EdgeInsets.only(right: 16),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.1),
@@ -254,7 +146,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                     ),
                   ),
                   Positioned(
-                    right: 2,
+                    right: 18,
                     top: 2,
                     child: Container(
                       width: 10,
@@ -269,47 +161,24 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: ScaleButton(
-                onPressed: _showSettingsModal,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
-
         body: StreamBuilder<DocumentSnapshot>(
           stream: FirebaseFirestore.instance
               .collection('users')
               .doc(_uid)
               .snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (snapshot.connectionState == ConnectionState.waiting)
               return const Center(
                 child: CircularProgressIndicator(
                   color: ColorConstants.primaryColor,
                 ),
               );
-            }
-
             if (snapshot.hasError ||
                 !snapshot.hasData ||
-                !snapshot.data!.exists) {
+                !snapshot.data!.exists)
               return _buildErrorState();
-            }
 
             final data = snapshot.data!.data() as Map<String, dynamic>;
             final bool isVerified =
@@ -320,12 +189,10 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // YENİ: APPBAR'IN ALTINDA EZİLMEMESİ İÇİN DİNAMİK BOŞLUK
                 SizedBox(
                   height:
                       MediaQuery.of(context).padding.top + kToolbarHeight + 16,
                 ),
-
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Text(
@@ -337,9 +204,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 if (!isVerified) _buildVerificationBanner(),
-
                 Expanded(
                   child: lessonSport == null
                       ? _buildEmptyState(isVerified)
@@ -351,7 +216,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             );
           },
         ),
-
         floatingActionButton: StreamBuilder<DocumentSnapshot>(
           stream: FirebaseFirestore.instance
               .collection('users')
@@ -360,11 +224,9 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
           builder: (context, snapshot) {
             if (!snapshot.hasData || !snapshot.data!.exists)
               return const SizedBox.shrink();
-
             final data = snapshot.data!.data() as Map<String, dynamic>;
             final bool isVerified =
                 data['isApproved'] ?? data['isVerified'] ?? false;
-
             if (!isVerified) return const SizedBox.shrink();
 
             return ScaleButton(
@@ -426,6 +288,46 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 
+  // --- SEKME 5: AYARLAR ---
+  Widget _buildSettingsTab() {
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        title: Text(
+          "Ayarlar",
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        children: [
+          _buildMenuItem(Icons.settings_outlined, "Uygulama Ayarları", () {}),
+          _buildMenuItem(
+            Icons.privacy_tip_outlined,
+            "Gizlilik Politikası",
+            () {},
+          ),
+          _buildMenuItem(Icons.help_outline, "Yardım & Destek", () {}),
+          const Divider(color: Colors.white10, height: 30),
+          _buildMenuItem(
+            Icons.logout,
+            "Çıkış Yap",
+            _signOut,
+            isDestructive: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- YARDIMCI WIDGET'LAR ---
   Widget _buildProfilePreview(Map<String, dynamic> data) {
     final String fullName =
         "${data['name'] ?? ''} ${data['surname'] ?? ''}".trim().isEmpty
@@ -779,10 +681,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
         color: Colors.white12,
         size: 14,
       ),
-      onTap: () {
-        Navigator.pop(context);
-        onTap();
-      },
+      onTap: onTap,
     );
   }
 }

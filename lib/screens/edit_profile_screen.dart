@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/gradient_background.dart';
+import 'welcome_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -17,7 +18,9 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final String _uid = FirebaseAuth.instance.currentUser!.uid;
+  // YENİ: KULLANICI ID'SİNİ GÜVENLİ (NULLABLE) HALE GETİRDİK
+  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -34,12 +37,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
 
-  // Yeni Eklenen Sporcu Alanları
   List<String> _selectedSports = [];
   String? _selectedLevel;
   String? _selectedGoal;
 
-  // SİHİRBAZDAKİ LİSTELERLE BİREBİR AYNI YAPILDI
   final List<String> _sportsList = [
     "Fitness",
     "Pilates",
@@ -73,15 +74,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    // YENİ: EĞER MİSAFİR DEĞİLSE VERİLERİ YÜKLE
+    if (FirebaseAuth.instance.currentUser != null) {
+      _loadUserData();
+    } else {
+      setState(() => _isLoading = false);
+    }
   }
 
   // --- VERİLERİ ÇEK ---
   Future<void> _loadUserData() async {
+    if (_uid == null) return; // Güvenlik kontrolü
+
     try {
       DocumentSnapshot doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(_uid)
+          .doc(_uid!)
           .get();
 
       if (doc.exists) {
@@ -96,8 +104,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _ageController.text = data['age']?.toString() ?? '';
             _heightController.text = data['height']?.toString() ?? '';
             _weightController.text = data['weight']?.toString() ?? '';
-
-            // ANAHTAR KELİMELER SİHİRBAZA GÖRE DÜZELTİLDİ
             _selectedSports = List<String>.from(data['interestedSports'] ?? []);
 
             String? fetchedLevel = data['experienceLevel'];
@@ -140,6 +146,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // --- PROFİLİ KAYDET ---
   Future<void> _saveProfile() async {
+    if (_uid == null) return; // Güvenlik kontrolü
+
     setState(() => _isSaving = true);
     try {
       String? newImageUrl = _profileImageUrl;
@@ -164,8 +172,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         updateData['age'] = _ageController.text.trim();
         updateData['height'] = _heightController.text.trim();
         updateData['weight'] = _weightController.text.trim();
-
-        // KAYIT ANAHTARLARI SİHİRBAZA GÖRE DÜZELTİLDİ
         updateData['interestedSports'] = _selectedSports;
         updateData['experienceLevel'] = _selectedLevel;
         updateData['goal'] = _selectedGoal;
@@ -175,7 +181,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       await FirebaseFirestore.instance
           .collection('users')
-          .doc(_uid)
+          .doc(_uid!)
           .update(updateData);
 
       if (mounted) {
@@ -189,7 +195,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.pop(context);
       }
     } catch (e) {
       _showError("Profil kaydedilirken bir hata oluştu: $e");
@@ -210,23 +215,97 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return GradientBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+    // 1. EĞER MİSAFİR İSE PROFİL OLUŞTURMA EKRANINI GÖSTER
+    if (FirebaseAuth.instance.currentUser == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF121212),
         appBar: AppBar(
           backgroundColor: Colors.black,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
+          automaticallyImplyLeading: false,
           title: Text(
-            "Profili Düzenle",
+            "Profilim",
             style: GoogleFonts.poppins(
               color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(
+                    color: ColorConstants.primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person_add_alt_1_rounded,
+                    size: 80,
+                    color: ColorConstants.primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Kendi profilini oluştur ve hedeflerine ulaşmak için ilk adımı at!",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorConstants.primaryColor,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    "Giriş Yap / Kayıt Ol",
+                    style: GoogleFonts.poppins(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 2. MİSAFİR DEĞİLSE NORMAL PROFİL DÜZENLEME EKRANINI ÇİZ
+    return GradientBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.black.withOpacity(0.6),
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          title: Text(
+            "Profilim",
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -238,11 +317,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               )
             : SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + kToolbarHeight + 24,
+                  left: 24,
+                  right: 24,
+                  bottom: 24,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- FOTOĞRAF ALANI ---
                     Center(
                       child: Stack(
                         alignment: Alignment.bottomRight,
@@ -285,15 +368,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // --- ORTAK BİLGİLER ---
                     _buildTextField("Ad", _nameController),
                     const SizedBox(height: 16),
                     _buildTextField("Soyad", _surnameController),
                     const SizedBox(height: 16),
 
-                    // --- SPORCU BİLGİLERİ ---
                     if (_userType == 'athlete') ...[
-                      // Fiziksel Özellikler
                       Row(
                         children: [
                           Expanded(
@@ -322,8 +402,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 24),
-
-                      // Hedef ve Seviye Seçimi (Dropdown)
                       Row(
                         children: [
                           Expanded(
@@ -346,8 +424,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 30),
-
-                      // İlgilendiği Sporlar (Çoklu Seçim / ChoiceChip)
                       Text(
                         "İlgilendiğin Sporlar",
                         style: GoogleFonts.poppins(
@@ -388,7 +464,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ],
 
-                    // --- ANTRENÖR BİLGİLERİ ---
                     if (_userType == 'coach') ...[
                       _buildTextField(
                         "Hakkımda (Bio)",
@@ -399,7 +474,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     const SizedBox(height: 40),
 
-                    // --- KAYDET BUTONU ---
                     _isSaving
                         ? const Center(
                             child: CircularProgressIndicator(
@@ -417,7 +491,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // --- YARDIMCI WIDGET: Metin Kutusu ---
   Widget _buildTextField(
     String label,
     TextEditingController controller, {
@@ -446,7 +519,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // --- YARDIMCI WIDGET: Açılır Menü (Dropdown) ---
   Widget _buildDropdown(
     String label,
     List<String> items,
@@ -456,7 +528,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return DropdownButtonFormField<String>(
       value: selectedValue,
       isExpanded: true,
-      dropdownColor: const Color(0xFF1E1E1E), // Açılan menünün arka planı
+      dropdownColor: const Color(0xFF1E1E1E),
       icon: const Icon(
         Icons.keyboard_arrow_down_rounded,
         color: Colors.white54,
