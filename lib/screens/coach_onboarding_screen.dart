@@ -26,19 +26,18 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   bool _isLoading = false;
 
   final List<String> _selectedSpecialties = [];
+  final TextEditingController _priceController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
   File? _selectedFile;
   String? _fileName;
 
-  String? _selectedLessonSport;
-  final TextEditingController _priceController = TextEditingController();
-  final List<String> _selectedDays = [];
-  final List<String> _selectedHours = [];
-  String? _coachCharacter;
   String? _deliveryMode;
+  String? _lessonFormat; // YENİ: Özel Ders / Grup Dersi
+  String? _coachCharacter;
 
-  // --- API KONUM DEĞİŞKENLERİ ---
+  Map<String, List<String>> _dayHoursMap = {};
+
   String? _selectedCity;
   String? _selectedDistrict;
   String? _selectedNeighborhood;
@@ -90,7 +89,9 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   ];
 
   bool get _needsLocation =>
-      _deliveryMode == "Yüzyüze" || _deliveryMode == "Hibrit(İkisi de)";
+      _deliveryMode == "Yüzyüze" ||
+      _deliveryMode == "Farketmez" ||
+      _deliveryMode == "Hibrit(İkisi de)";
 
   @override
   void initState() {
@@ -98,7 +99,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     _fetchCities();
   }
 
-  // --- API: İLLERİ ÇEK ---
   Future<void> _fetchCities() async {
     setState(() => _isLoadingLocation = true);
     try {
@@ -115,13 +115,11 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         });
       }
     } catch (e) {
-      _showError("İller yüklenirken hata oluştu.");
     } finally {
       setState(() => _isLoadingLocation = false);
     }
   }
 
-  // --- API: İLÇELERİ ÇEK ---
   Future<void> _fetchDistricts(int provinceId) async {
     setState(() {
       _isLoadingLocation = true;
@@ -146,13 +144,11 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         });
       }
     } catch (e) {
-      _showError("İlçeler yüklenirken hata oluştu.");
     } finally {
       setState(() => _isLoadingLocation = false);
     }
   }
 
-  // --- API: MAHALLELERİ ÇEK ---
   Future<void> _fetchNeighborhoods(int districtId) async {
     setState(() {
       _isLoadingLocation = true;
@@ -175,23 +171,20 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         });
       }
     } catch (e) {
-      _showError("Mahalleler yüklenirken hata oluştu.");
     } finally {
       setState(() => _isLoadingLocation = false);
     }
   }
 
-  // --- DİNAMİK SAYFA LİSTESİ ---
   List<Widget> get _pages {
     List<Widget> p = [
-      _buildStep1Specialties(),
+      _buildStep1SpecialtiesAndPrice(),
       _buildStep2Bio(),
       _buildStep3References(),
-      _buildStep4LessonSport(),
+      _buildStep4DeliveryMode(),
+      _buildStepLessonFormat(), // YENİ EKLENDİ
     ];
-    if (_needsLocation) {
-      p.add(_buildStepLocation());
-    }
+    if (_needsLocation) p.add(_buildStepLocation());
     p.add(_buildStep5Availability());
     p.add(_buildStep6Character());
     return p;
@@ -203,57 +196,55 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
       );
-      if (result != null) {
+      if (result != null)
         setState(() {
           _selectedFile = File(result.files.single.path!);
           _fileName = result.files.single.name;
         });
-      }
     } catch (e) {
-      _showError("Dosya seçilirken bir hata oluştu: $e");
+      _showError("Dosya seçilirken bir hata oluştu.");
     }
   }
 
   void _nextPage() {
     final int totalPages = _pages.length;
 
-    if (_currentIndex == 0 && _selectedSpecialties.isEmpty)
-      return _showError("Lütfen en az bir uzmanlık alanı seçin.");
+    if (_currentIndex == 0 &&
+        (_selectedSpecialties.isEmpty || _priceController.text.trim().isEmpty))
+      return _showError(
+        "Lütfen uzmanlık alanınızı ve saatlik ücretinizi girin.",
+      );
     if (_currentIndex == 1 &&
         (_bioController.text.trim().isEmpty ||
             _bioController.text.trim().length < 20))
-      return _showError("Bio en az 20 karakter olmalıdır.");
+      return _showError("Hakkında kısmı en az 20 karakter olmalıdır.");
     if (_currentIndex == 2 &&
         _referenceController.text.trim().isEmpty &&
         _selectedFile == null)
       return _showError("Lütfen bir referans linki girin veya belge yükleyin.");
-    if (_currentIndex == 3 &&
-        (_selectedLessonSport == null ||
-            _priceController.text.isEmpty ||
-            _deliveryMode == null))
-      return _showError("Lütfen branş, ders şekli ve ücret belirleyin.");
+    if (_currentIndex == 3 && _deliveryMode == null)
+      return _showError("Lütfen çalışma şeklini seçin.");
+    if (_currentIndex == 4 && _lessonFormat == null)
+      return _showError("Lütfen verdiğiniz ders tipini seçin.");
 
     if (_needsLocation) {
-      if (_currentIndex == 4 &&
+      if (_currentIndex == 5 &&
           (_selectedCity == null ||
               _selectedDistrict == null ||
               _selectedNeighborhood == null ||
               _addressTitleController.text.isEmpty ||
-              _addressDetailController.text.isEmpty)) {
+              _addressDetailController.text.isEmpty))
         return _showError(
           "Lütfen il, ilçe ve adres bilgilerini eksiksiz doldurun.",
         );
-      }
-      if (_currentIndex == 5 &&
-          (_selectedDays.isEmpty || _selectedHours.isEmpty))
-        return _showError("Lütfen en az bir gün ve saat aralığı seçin.");
-      if (_currentIndex == 6 && _coachCharacter == null)
+      if (_currentIndex == 6 && _dayHoursMap.isEmpty)
+        return _showError("Lütfen en az bir gün için saat aralığı belirleyin.");
+      if (_currentIndex == 7 && _coachCharacter == null)
         return _showError("Lütfen eğitmen karakterinizi seçin.");
     } else {
-      if (_currentIndex == 4 &&
-          (_selectedDays.isEmpty || _selectedHours.isEmpty))
-        return _showError("Lütfen en az bir gün ve saat aralığı seçin.");
-      if (_currentIndex == 5 && _coachCharacter == null)
+      if (_currentIndex == 5 && _dayHoursMap.isEmpty)
+        return _showError("Lütfen en az bir gün için saat aralığı belirleyin.");
+      if (_currentIndex == 6 && _coachCharacter == null)
         return _showError("Lütfen eğitmen karakterinizi seçin.");
     }
 
@@ -297,15 +288,25 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         referenceLinks.add(await storageRef.getDownloadURL());
       }
 
+      List<String> finalDays = _dayHoursMap.keys.toList();
+      List<String> finalHours = _dayHoursMap.values
+          .expand((h) => h)
+          .toSet()
+          .toList();
+
       Map<String, dynamic> updateData = {
         'specialties': _selectedSpecialties,
+        'lessonSport': _selectedSpecialties.isNotEmpty
+            ? _selectedSpecialties.first
+            : "Genel",
+        'hourlyRate': int.tryParse(_priceController.text) ?? 0,
         'bio': _bioController.text.trim(),
         'referenceLinks': referenceLinks,
-        'lessonSport': _selectedLessonSport,
-        'hourlyRate': int.tryParse(_priceController.text) ?? 0,
-        'availableDays': _selectedDays,
-        'availableHours': _selectedHours,
         'deliveryMode': _deliveryMode,
+        'lessonFormat': _lessonFormat, // Yeni
+        'availableDays': finalDays,
+        'availableHours': finalHours,
+        'dayHoursMap': _dayHoursMap,
         'coachCharacter': _coachCharacter,
         'isApproved': false,
         'isOnboardingCompleted': true,
@@ -322,14 +323,12 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
       }
 
       await _authService.updateUserProfile(uid: uid, data: updateData);
-
-      if (mounted) {
+      if (mounted)
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const CoachHomeScreen()),
           (route) => false,
         );
-      }
     } catch (e) {
       _showError("Hata: $e");
     } finally {
@@ -421,33 +420,66 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  Widget _buildStep1Specialties() {
+  Widget _buildStep1SpecialtiesAndPrice() {
     return _buildStepContainer(
-      title: "Uzmanlık Alanların",
-      subtitle: "Hangi branşlarda eğitim veriyorsun?",
+      title: "Uzmanlık ve Ücret",
+      subtitle: "Hangi branşlarda eğitim veriyorsun ve saatlik ücretin nedir?",
       child: SingleChildScrollView(
-        child: Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: _specialties.map((specialty) {
-            final isSelected = _selectedSpecialties.contains(specialty);
-            return ChoiceChip(
-              label: Text(specialty),
-              labelStyle: GoogleFonts.poppins(
-                color: isSelected
-                    ? Colors.black
-                    : const Color.fromARGB(179, 9, 9, 9),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _specialties.map((specialty) {
+                final isSelected = _selectedSpecialties.contains(specialty);
+                return ChoiceChip(
+                  label: Text(specialty),
+                  labelStyle: GoogleFonts.poppins(
+                    color: isSelected
+                        ? Colors.black
+                        : const Color.fromARGB(179, 9, 9, 9),
+                  ),
+                  selected: isSelected,
+                  selectedColor: ColorConstants.primaryColor,
+                  backgroundColor: Colors.white10,
+                  onSelected: (selected) => setState(
+                    () => selected
+                        ? _selectedSpecialties.add(specialty)
+                        : _selectedSpecialties.remove(specialty),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              "Saatlik Ücret (TL)",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
-              selected: isSelected,
-              selectedColor: ColorConstants.primaryColor,
-              backgroundColor: Colors.white10,
-              onSelected: (selected) => setState(
-                () => selected
-                    ? _selectedSpecialties.add(specialty)
-                    : _selectedSpecialties.remove(specialty),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _priceController,
+              keyboardType: TextInputType.number,
+              style: GoogleFonts.poppins(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: "Örn: 500",
+                hintStyle: GoogleFonts.poppins(color: Colors.white30),
+                filled: true,
+                fillColor: Colors.white10,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                prefixIcon: const Icon(
+                  Icons.attach_money_rounded,
+                  color: Colors.white54,
+                ),
               ),
-            );
-          }).toList(),
+            ),
+          ],
         ),
       ),
     );
@@ -455,8 +487,9 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
 
   Widget _buildStep2Bio() {
     return _buildStepContainer(
-      title: "Kendini Tanıt",
-      subtitle: "Sporcuların seni daha iyi tanıması için kısa bir bio yaz.",
+      title: "Hakkında",
+      subtitle:
+          "Sporcuların seni daha iyi tanıması için kısa bir profil yazısı yaz.",
       child: TextField(
         controller: _bioController,
         maxLines: 6,
@@ -479,7 +512,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   Widget _buildStep3References() {
     return _buildStepContainer(
       title: "Referansların",
-      subtitle: "Sosyal medya linki veya sertifika yükleyebilirsin.",
+      subtitle: "Sosyal medya linki veya antrenörlük belgesi yükleyebilirsin.",
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -532,96 +565,48 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  Widget _buildStep4LessonSport() {
+  Widget _buildStep4DeliveryMode() {
     return _buildStepContainer(
-      title: "Ders Detayları",
-      subtitle: "Branşını, ücretini ve ders verme şeklini belirle.",
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Branş",
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: _specialties.map((sport) {
-                final isSelected = _selectedLessonSport == sport;
-                return ChoiceChip(
-                  label: Text(sport),
-                  labelStyle: GoogleFonts.poppins(
-                    color: isSelected
-                        ? Colors.black
-                        : const Color.fromARGB(179, 0, 0, 0),
-                  ),
-                  selected: isSelected,
-                  selectedColor: ColorConstants.primaryColor,
-                  backgroundColor: Colors.white10,
-                  onSelected: (selected) => setState(
-                    () => _selectedLessonSport = selected ? sport : null,
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Nasıl Ders Veriyorsun?",
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _buildModeButton("Online", Icons.wifi),
-                const SizedBox(width: 10),
-                _buildModeButton("Yüzyüze", Icons.people),
-                const SizedBox(width: 10),
-                _buildModeButton("Hibrit(İkisi de)", Icons.compare_arrows),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Saatlik Ücret (TL)",
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _priceController,
-              keyboardType: TextInputType.number,
-              style: GoogleFonts.poppins(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: "Örn: 500",
-                hintStyle: GoogleFonts.poppins(color: Colors.white30),
-                filled: true,
-                fillColor: Colors.white10,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-                prefixIcon: const Icon(
-                  Icons.attach_money_rounded,
-                  color: Colors.white54,
-                ),
-              ),
-            ),
-          ],
-        ),
+      title: "Çalışma Şekli",
+      subtitle: "Öğrencilerinle dersleri nasıl işleyeceksin?",
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildModeButton("Online", Icons.wifi, true),
+              const SizedBox(width: 10),
+              _buildModeButton("Yüzyüze", Icons.people, true),
+              const SizedBox(width: 10),
+              _buildModeButton("Hibrit(İkisi de)", Icons.compare_arrows, true),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  // --- GÜÇLENDİRİLMİŞ KONUM ADIMI ---
+  // --- YENİ ADIM: DERS FORMATI ---
+  Widget _buildStepLessonFormat() {
+    return _buildStepContainer(
+      title: "Ders Formatı",
+      subtitle: "Nasıl dersler vereceksiniz?",
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _buildModeButton("Özel Ders", Icons.person, false),
+              const SizedBox(width: 10),
+              _buildModeButton("Grup Dersi", Icons.groups, false),
+              const SizedBox(width: 10),
+              _buildModeButton("İkisi de", Icons.all_inclusive_rounded, false),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStepLocation() {
     return _buildStepContainer(
       title: "Konum Bilgileri",
@@ -655,7 +640,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-
                 _buildDropdown(
                   "İlçe",
                   _selectedCity == null
@@ -680,7 +664,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                   },
                 ),
                 const SizedBox(height: 16),
-
                 _buildDropdown(
                   "Semt / Mahalle",
                   _selectedDistrict == null
@@ -692,12 +675,10 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                   (val) {
                     if (val != null &&
                         val != "Önce İlçe Seçin" &&
-                        val != "Seçenek bulunamadı") {
+                        val != "Seçenek bulunamadı")
                       setState(() => _selectedNeighborhood = val);
-                    }
                   },
                 ),
-
                 const SizedBox(height: 24),
                 Text(
                   "Adres Tarifi",
@@ -714,7 +695,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  "Adres Başlığı(Doğru yazdığınızdan emin olun!!)",
+                  "Adres Başlığı",
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -723,14 +704,13 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                 const SizedBox(height: 8),
                 _buildTextField(
                   _addressTitleController,
-                  "Örn: MacFit Spor Salonu, Moda Parkı, X Yüzme Havuzu",
+                  "Örn: MacFit, Moda Parkı",
                   maxLines: 1,
                 ),
                 const SizedBox(height: 40),
               ],
             ),
           ),
-
           if (_isLoadingLocation)
             Positioned.fill(
               child: Container(
@@ -752,68 +732,139 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
 
   Widget _buildStep5Availability() {
     return _buildStepContainer(
-      title: "Müsaitlik Durumu",
-      subtitle: "Hangi gün ve saatlerde ders verebilirsin?",
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Günler",
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+      title: "Çalışma Saatleri",
+      subtitle: "Müsait olduğunuz günleri ve saatleri belirleyin.",
+      child: ListView.separated(
+        itemCount: _daysList.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          String day = _daysList[index];
+          List<String> selectedHours = _dayHoursMap[day] ?? [];
+          bool isSelected = selectedHours.isNotEmpty;
+          return ListTile(
+            onTap: () => _showHoursPopup(day),
+            tileColor: isSelected
+                ? ColorConstants.primaryColor.withOpacity(0.1)
+                : Colors.white10,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                color: isSelected
+                    ? ColorConstants.primaryColor.withOpacity(0.5)
+                    : Colors.transparent,
               ),
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _daysList.map((day) {
-                final isSelected = _selectedDays.contains(day);
-                return ChoiceChip(
-                  label: Text(day),
-                  selected: isSelected,
-                  selectedColor: ColorConstants.primaryColor,
-                  backgroundColor: Colors.white10,
-                  onSelected: (val) => setState(
-                    () => val
-                        ? _selectedDays.add(day)
-                        : _selectedDays.remove(day),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Saat Aralıkları",
+            title: Text(
+              day,
               style: GoogleFonts.poppins(
                 color: Colors.white,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _hoursList.map((hour) {
-                final isSelected = _selectedHours.contains(hour);
-                return ChoiceChip(
-                  label: Text(hour),
-                  selected: isSelected,
-                  selectedColor: ColorConstants.primaryColor,
-                  backgroundColor: Colors.white10,
-                  onSelected: (val) => setState(
-                    () => val
-                        ? _selectedHours.add(hour)
-                        : _selectedHours.remove(hour),
-                  ),
-                );
-              }).toList(),
+            subtitle: Text(
+              isSelected
+                  ? selectedHours.join(', ')
+                  : "Saat seçmek için dokunun",
+              style: GoogleFonts.poppins(
+                color: isSelected
+                    ? ColorConstants.primaryColor
+                    : Colors.white54,
+                fontSize: 12,
+              ),
             ),
-          ],
-        ),
+            trailing: Icon(
+              Icons.timelapse_rounded,
+              color: isSelected ? ColorConstants.primaryColor : Colors.white54,
+            ),
+          );
+        },
       ),
+    );
+  }
+
+  void _showHoursPopup(String day) {
+    List<String> tempHours = List.from(_dayHoursMap[day] ?? []);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                "$day Saatleri",
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _hoursList.map((h) {
+                    bool isSel = tempHours.contains(h);
+                    return ChoiceChip(
+                      label: Text(h),
+                      selected: isSel,
+                      selectedColor: ColorConstants.primaryColor,
+                      backgroundColor: Colors.white10,
+                      labelStyle: GoogleFonts.poppins(
+                        color: Colors.black,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (val) {
+                        setDialogState(() {
+                          if (val)
+                            tempHours.add(h);
+                          else
+                            tempHours.remove(h);
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    "İptal",
+                    style: GoogleFonts.poppins(color: Colors.white54),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      if (tempHours.isEmpty)
+                        _dayHoursMap.remove(day);
+                      else
+                        _dayHoursMap[day] = tempHours;
+                    });
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorConstants.primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    "Kaydet",
+                    style: GoogleFonts.poppins(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -897,11 +948,18 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  Widget _buildModeButton(String label, IconData icon) {
-    final isSelected = _deliveryMode == label;
+  Widget _buildModeButton(String label, IconData icon, bool isDelivery) {
+    final isSelected = isDelivery
+        ? _deliveryMode == label
+        : _lessonFormat == label;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _deliveryMode = label),
+        onTap: () => setState(() {
+          if (isDelivery)
+            _deliveryMode = label;
+          else
+            _lessonFormat = label;
+        }),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -938,25 +996,17 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  // --- KİLİTLENMEYE KARŞI GÜÇLENDİRİLMİŞ DROPDOWN ---
   Widget _buildDropdown(
     String label,
     List<String> items,
     String? selectedValue,
     ValueChanged<String?> onChanged,
   ) {
-    // 1. Tekrarlanan verileri engeller (Örn: İki tane Merkez Mah. varsa Flutter çökerdi)
     final uniqueItems = items.toSet().toList();
-
-    // 2. Liste tamamen boşsa tıkanmasını önlemek için sahte bir öğe koyar
-    if (uniqueItems.isEmpty) {
-      uniqueItems.add("Seçenek bulunamadı");
-    }
-
+    if (uniqueItems.isEmpty) uniqueItems.add("Seçenek bulunamadı");
     final safeValue = uniqueItems.contains(selectedValue)
         ? selectedValue
         : null;
-
     return DropdownButtonFormField<String>(
       value: safeValue,
       isExpanded: true,

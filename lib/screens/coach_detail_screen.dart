@@ -11,9 +11,8 @@ import '../widgets/scale_button.dart';
 import '../widgets/gradient_background.dart';
 import 'chat_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'welcome_screen.dart'; // MİSAFİRLERİ YÖNLENDİRMEK İÇİN EKLENDİ
+import 'welcome_screen.dart';
 
-// --- MİSAFİR KULLANICILAR İÇİN ORTAK UYARI POP-UP'I ---
 void showGuestRegistrationPopup(BuildContext context) {
   showDialog(
     context: context,
@@ -44,7 +43,7 @@ void showGuestRegistrationPopup(BuildContext context) {
         ),
         ElevatedButton(
           onPressed: () {
-            Navigator.pop(context); // Dialogu kapat
+            Navigator.pop(context);
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const WelcomeScreen()),
@@ -71,9 +70,7 @@ void showGuestRegistrationPopup(BuildContext context) {
 
 class CoachDetailScreen extends StatefulWidget {
   final Map<String, dynamic> coachData;
-
   const CoachDetailScreen({super.key, required this.coachData});
-
   @override
   State<CoachDetailScreen> createState() => _CoachDetailScreenState();
 }
@@ -90,7 +87,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
     initializeDateFormatting('tr_TR', null);
   }
 
-  // --- TAKVİM MODALI (Hem Takvimi Gösterir Hem De Randevu Alır) ---
   void _showCoachCalendarModal() {
     showModalBottomSheet(
       context: context,
@@ -159,21 +155,19 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         .orderBy('timestamp', descending: true)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
+                      if (snapshot.connectionState == ConnectionState.waiting)
                         return const Center(
                           child: CircularProgressIndicator(
                             color: ColorConstants.primaryColor,
                           ),
                         );
-                      }
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
                         return Center(
                           child: Text(
                             "Henüz yorum yapılmamış.",
                             style: GoogleFonts.poppins(color: Colors.white54),
                           ),
                         );
-                      }
                       return ListView.builder(
                         controller: scrollController,
                         padding: const EdgeInsets.symmetric(
@@ -286,10 +280,11 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
         widget.coachData['deliveryMode'] ?? "Online/Yüzyüze";
     final int price = widget.coachData['hourlyRate'] ?? 0;
     final List<dynamic> specialties = widget.coachData['specialties'] ?? [];
-
     final Map<String, dynamic>? location = widget.coachData['location'];
     final bool isFaceToFace =
-        deliveryMode == "Yüzyüze" || deliveryMode == "Hibrit(İkisi de)";
+        deliveryMode == "Yüzyüze" ||
+        deliveryMode == "Farketmez" ||
+        deliveryMode == "Hibrit(İkisi de)";
 
     return GradientBackground(
       child: Scaffold(
@@ -439,13 +434,11 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         Expanded(
                           child: ScaleButton(
                             onPressed: () {
-                              // --- GÜVENLİK: MİSAFİRSE MESAJ ATAMAZ ---
                               if (_auth.currentUser == null) {
                                 showGuestRegistrationPopup(context);
                                 return;
                               }
-
-                              if (coachUid.isNotEmpty) {
+                              if (coachUid.isNotEmpty)
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -455,7 +448,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                     ),
                                   ),
                                 );
-                              }
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -486,152 +478,41 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        StreamBuilder<QuerySnapshot>(
-                          stream: _firestore
-                              .collection('lessons')
-                              .where('coachId', isEqualTo: coachUid)
-                              .snapshots(),
-                          builder: (context, snapshot) {
-                            bool isBookedByMe = false;
-                            bool isBookedBySomeoneElse = false;
-                            if (snapshot.hasData) {
-                              for (var doc in snapshot.data!.docs) {
-                                if (doc['status'] == 'pending' ||
-                                    doc['status'] == 'approved') {
-                                  // --- GÜVENLİK: MİSAFİRSE ÇÖKMESİN ---
-                                  if (_auth.currentUser != null &&
-                                      doc['athleteId'] ==
-                                          _auth.currentUser!.uid) {
-                                    isBookedByMe = true;
-                                  } else {
-                                    isBookedBySomeoneElse = true;
-                                  }
-                                }
-                              }
-                            }
-                            if (isBookedByMe) {
-                              return Expanded(
-                                flex: 2,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                    horizontal: 8,
+                        Expanded(
+                          flex: 2,
+                          child: ScaleButton(
+                            onPressed: _showCoachCalendarModal,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                color: ColorConstants.primaryColor,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_month_rounded,
+                                    color: Colors.black,
+                                    size: 22,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: Colors.green.withOpacity(0.5),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.check_circle_rounded,
-                                        color: Colors.green,
-                                        size: 20,
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      "Dersi Al",
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          "Ders Alındı",
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.green,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            } else if (isBookedBySomeoneElse) {
-                              return Expanded(
-                                flex: 2,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                    horizontal: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.redAccent.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: Colors.redAccent.withOpacity(0.5),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Icon(
-                                        Icons.lock_outline_rounded,
-                                        color: Colors.redAccent,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          "Bu Ders Zaten Alındı",
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.redAccent,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            } else {
-                              // DERSİ AL BUTONU TAKVİMİ AÇIYOR (Misafirler de takvimi görebilir)
-                              return Expanded(
-                                flex: 2,
-                                child: ScaleButton(
-                                  onPressed: _showCoachCalendarModal,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: ColorConstants.primaryColor,
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(
-                                          Icons.calendar_month_rounded,
-                                          color: Colors.black,
-                                          size: 22,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Flexible(
-                                          child: Text(
-                                            "Dersi Al",
-                                            style: GoogleFonts.poppins(
-                                              color: Colors.black,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 15,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-                          },
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -707,10 +588,7 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         );
                       },
                     ),
-
                     const SizedBox(height: 24),
-
-                    // ŞIK TAKVİM BUTONU
                     ScaleButton(
                       onPressed: _showCoachCalendarModal,
                       child: Container(
@@ -783,7 +661,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
                     Text(
                       "Hakkında",
                       style: GoogleFonts.poppins(
@@ -803,7 +680,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // --- KONUM BİLGİSİ WIDGET'I ---
                     if (isFaceToFace && location != null) ...[
                       Text(
                         "Konum Bilgisi",
@@ -814,26 +690,32 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-
                       ScaleButton(
                         onPressed: () async {
-                          final String query =
+                          // --- YENİ HARİTA URL MANTIĞI ---
+                          // Boşlukları ve Türkçe karakterleri + işaretine ve uygun formata çeviren güvenli yöntem
+                          final String rawQuery =
                               "${location['addressTitle']} ${location['neighborhood']} ${location['district']} ${location['city']}";
+                          final String encodedQuery = Uri.encodeComponent(
+                            rawQuery,
+                          );
+                          // Universal Google Maps Search Linki
                           final Uri mapUrl = Uri.parse(
-                            "https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}",
+                            "https://www.google.com/maps/search/?api=1&query=$encodedQuery",
                           );
 
-                          if (await canLaunchUrl(mapUrl)) {
+                          try {
+                            // Doğrudan fırlat, sistem haritaları açsın
                             await launchUrl(
                               mapUrl,
                               mode: LaunchMode.externalApplication,
                             );
-                          } else {
+                          } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    "Harita açılamadı.",
+                                    "Harita uygulaması açılamadı. Hata: $e",
                                     style: GoogleFonts.poppins(),
                                   ),
                                   backgroundColor: Colors.redAccent,
@@ -929,7 +811,7 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                     ],
 
                     Text(
-                      "Ders Detayları",
+                      "Hoca Detayları",
                       style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: 18,
@@ -938,6 +820,7 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                     ),
                     const SizedBox(height: 12),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(
                           Icons.sports_gymnastics_rounded,
@@ -949,11 +832,15 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                           "Branş: ",
                           style: GoogleFonts.poppins(color: Colors.white70),
                         ),
-                        Text(
-                          lessonSport,
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Text(
+                            specialties.isNotEmpty
+                                ? specialties.join(', ')
+                                : lessonSport,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -981,42 +868,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    if (specialties.isNotEmpty) ...[
-                      Text(
-                        "Tüm Uzmanlık Alanları",
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: specialties
-                            .map<Widget>(
-                              (s) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white10,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  s.toString(),
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.white70,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -1028,9 +879,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
   }
 }
 
-// -------------------------------------------------------------------------
-// --- SPORCU İÇİN CANLI TAKVİM VE RANDEVU ALMA MODALI (AKILLI SİSTEM) ---
-// -------------------------------------------------------------------------
 class _AthleteCalendarModal extends StatefulWidget {
   final Map<String, dynamic> coachData;
   final ScrollController scrollController;
@@ -1052,11 +900,9 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
   List<Map<String, dynamic>> _activities = [];
   List<Map<String, dynamic>> _routines = [];
 
-  StreamSubscription? _lessonsSub;
-  StreamSubscription? _activitiesSub;
-  StreamSubscription? _routinesSub;
+  StreamSubscription? _lessonsSub, _activitiesSub, _routinesSub;
 
-  // Randevu Tercih Değişkenleri
+  String? _selectedSport; // SPORCUNUN SEÇECEĞİ ÖZEL DERS BRANŞI
   String? _selectedStartTime;
   String? _selectedEndTime;
   String _selectedLessonType = 'Online';
@@ -1070,9 +916,15 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
     super.initState();
     _coachUid = widget.coachData['uid'] ?? '';
     _availableDays = widget.coachData['availableDays'] ?? [];
-
-    if (widget.coachData['deliveryMode'] == 'Yüzyüze') {
+    if (widget.coachData['deliveryMode'] == 'Yüzyüze')
       _selectedLessonType = 'Yüzyüze';
+
+    // VARSAYILAN BRANŞI AYARLA
+    List<dynamic> specs = widget.coachData['specialties'] ?? [];
+    if (specs.isNotEmpty) {
+      _selectedSport = specs.first.toString();
+    } else {
+      _selectedSport = widget.coachData['lessonSport'] ?? 'Genel';
     }
 
     _setupStreams();
@@ -1141,23 +993,18 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
   List<String> _getValidHours() {
     List<dynamic> availableRanges = widget.coachData['availableHours'] ?? [];
     Set<int> hours = {};
-
     for (String range in availableRanges) {
       var parts = range.split('-');
       if (parts.length == 2) {
         int start = int.tryParse(parts[0].split(':')[0].trim()) ?? 0;
         int end = int.tryParse(parts[1].split(':')[0].trim()) ?? 0;
         if (end == 0) end = 24;
-        for (int i = start; i <= end; i++) {
-          hours.add(i);
-        }
+        for (int i = start; i <= end; i++) hours.add(i);
       }
     }
-
     if (hours.isEmpty) {
       for (int i = 8; i <= 22; i++) hours.add(i);
     }
-
     List<int> sorted = hours.toList()..sort();
     return sorted.map((h) => "${h.toString().padLeft(2, '0')}:00").toList();
   }
@@ -1171,7 +1018,8 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
     List<String> busyHours = [];
 
     for (var l in _lessons) {
-      if ((l['days'] as List).contains(dayName)) {
+      if (l['lessonType'] != 'Grup Dersi' &&
+          (l['days'] as List).contains(dayName)) {
         var h = (l['hours'] as List).map((e) => e.toString()).toList();
         busyHours.addAll(h);
       }
@@ -1189,6 +1037,27 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
       }
     }
 
+    var allEvents = [
+      ..._activities.where((a) => a['date'] == dateStr),
+      ..._routines.where((r) => (r['days'] as List).contains(dayName)),
+    ];
+    for (var ev in allEvents) {
+      if (ev['isGroupLesson'] == true) {
+        int enrolled =
+            (ev['currentEnrolled'] ?? 0) +
+            _lessons
+                .where(
+                  (l) =>
+                      l['lessonType'] == 'Grup Dersi' &&
+                      (l['hours'] as List).contains(ev['hour']),
+                )
+                .length;
+        if (enrolled >= (ev['maxCapacity'] ?? 10)) {
+          if (ev['hour'] != null) busyHours.add(ev['hour']);
+        }
+      }
+    }
+
     return {
       'isRed': hasUnavailable,
       'isYellow': !hasUnavailable && busyHours.isNotEmpty,
@@ -1202,7 +1071,6 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
     bool isRed = data['isRed'];
     bool isYellow = data['isYellow'];
     bool isGreen = data['isGreen'];
-
     Color? bgColor;
     Color txtColor = Colors.white70;
 
@@ -1240,38 +1108,31 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
     );
   }
 
-  Widget _legendDot(Color color, String text) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: GoogleFonts.poppins(color: Colors.white54, fontSize: 11),
-        ),
-      ],
-    );
-  }
+  Future<void> _submitLessonRequest(
+    bool isPreMeeting, {
+    String? customHourRange,
+    String? specificType,
+    String? specificSport, // GRUP DERSİ VEYA ÖZEL SEÇİM İÇİN
+  }) async {
+    String finalHours =
+        customHourRange ?? "$_selectedStartTime - $_selectedEndTime";
+    String finalType = specificType ?? _selectedLessonType;
+    String finalSport = isPreMeeting
+        ? "Ön Görüşme (10 Dk)"
+        : (specificSport ??
+              _selectedSport ??
+              widget.coachData['lessonSport'] ??
+              "Genel");
 
-  Future<void> _submitLessonRequest(bool isPreMeeting) async {
-    if (_selectedStartTime == null || _selectedEndTime == null) {
+    if (finalHours.contains('null')) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            "Lütfen başlangıç ve bitiş saatlerini seçin.",
-            style: GoogleFonts.poppins(),
-          ),
+          content: Text("Lütfen saat seçin.", style: GoogleFonts.poppins()),
           backgroundColor: Colors.redAccent,
         ),
       );
       return;
     }
-
     setState(() => _isSubmitting = true);
     try {
       final currentUser = FirebaseAuth.instance.currentUser!;
@@ -1288,11 +1149,7 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
               .trim();
 
       String dateStr = DateFormat('yyyy-MM-dd').format(_selectedDay!);
-      String hourRange = "$_selectedStartTime - $_selectedEndTime";
       int price = isPreMeeting ? 0 : (widget.coachData['hourlyRate'] ?? 0);
-      String sportType = isPreMeeting
-          ? "Ön Görüşme (10 Dk)"
-          : (widget.coachData['lessonSport'] ?? "Genel");
 
       await FirebaseFirestore.instance.collection('lessons').add({
         'coachId': _coachUid,
@@ -1301,13 +1158,13 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
         'athleteId': currentUser.uid,
         'athleteName': myName.isEmpty ? "Öğrenci" : myName,
         'athleteImage': myImage,
-        'sport': sportType,
+        'sport': finalSport,
         'days': [_getWeekdayString(_selectedDay!.weekday)],
         'date': dateStr,
-        'hours': [hourRange],
+        'hours': [finalHours],
         'price': price,
         'status': 'pending',
-        'lessonType': _selectedLessonType,
+        'lessonType': finalType,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -1317,8 +1174,8 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
           SnackBar(
             content: Text(
               isPreMeeting
-                  ? "Ön görüşme talebiniz iletildi!"
-                  : "Ders talebiniz eğitmenine iletildi!",
+                  ? "Ön görüşme talebi iletildi!"
+                  : "Ders talebiniz başarıyla iletildi! Onaylandığında bildirim alacaksınız.",
               style: GoogleFonts.poppins(),
             ),
             backgroundColor: Colors.green,
@@ -1370,19 +1227,77 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
             ),
           ),
           const SizedBox(height: 16),
-
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 16,
             runSpacing: 8,
             children: [
-              _legendDot(ColorConstants.primaryColor, "Müsait"),
-              _legendDot(Colors.amber, "Kısmen Dolu"),
-              _legendDot(Colors.redAccent, "Tamamen Dolu"),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: ColorConstants.primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "Müsait",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white54,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: Colors.amber,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "Kısmen Dolu",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white54,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "Tamamen Dolu",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white54,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 12),
-
           TableCalendar(
             locale: 'tr_TR',
             firstDay: DateTime.utc(2023, 1, 1),
@@ -1429,7 +1344,6 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
             ),
           ),
           const SizedBox(height: 24),
-
           if (_selectedDay != null) ...[
             Container(
               width: double.infinity,
@@ -1444,6 +1358,21 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                   var data = _getDayData(_selectedDay!);
                   List<String> hours = data['busyHours'];
                   List<String> validHours = _getValidHours();
+
+                  String dayName = _getWeekdayString(_selectedDay!.weekday);
+                  String dateStr = DateFormat(
+                    'yyyy-MM-dd',
+                  ).format(_selectedDay!);
+                  List<Map<String, dynamic>> todayGroupLessons = [
+                    ..._activities.where(
+                      (a) => a['date'] == dateStr && a['isGroupLesson'] == true,
+                    ),
+                    ..._routines.where(
+                      (r) =>
+                          (r['days'] as List).contains(dayName) &&
+                          r['isGroupLesson'] == true,
+                    ),
+                  ];
 
                   if (data['isRed']) {
                     return Column(
@@ -1474,26 +1403,244 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (data['isYellow']) ...[
+                        if (todayGroupLessons.isNotEmpty) ...[
                           Row(
                             children: [
                               const Icon(
-                                Icons.warning_amber_rounded,
-                                color: Colors.amber,
+                                Icons.groups_rounded,
+                                color: Colors.blueAccent,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  "Dolu Saatler",
-                                  style: GoogleFonts.poppins(
-                                    color: Colors.amber,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                              Text(
+                                "Bugünün Grup Dersleri",
+                                style: GoogleFonts.poppins(
+                                  color: Colors.blueAccent,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 12),
+                          ...todayGroupLessons.map((gEvent) {
+                            int totalEnrolled =
+                                (gEvent['currentEnrolled'] ?? 0) +
+                                _lessons
+                                    .where(
+                                      (l) =>
+                                          l['lessonType'] == 'Grup Dersi' &&
+                                          (l['hours'] as List).contains(
+                                            gEvent['hour'],
+                                          ),
+                                    )
+                                    .length;
+                            int maxCap = gEvent['maxCapacity'] ?? 10;
+                            bool isFull = totalEnrolled >= maxCap;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.blueAccent.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.blueAccent.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          gEvent['title'] ?? 'Grup Dersi',
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white10,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          gEvent['hour'] ?? '',
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Branş: ${gEvent['sport'] ?? widget.coachData['lessonSport'] ?? 'Genel'}",
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.blueAccent,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.people_alt_rounded,
+                                        color: Colors.blueAccent,
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        "Kayıtlı: $totalEnrolled / $maxCap Kişi",
+                                        style: GoogleFonts.poppins(
+                                          color: Colors.white70,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: isFull
+                                          ? null
+                                          : () {
+                                              if (FirebaseAuth
+                                                      .instance
+                                                      .currentUser ==
+                                                  null) {
+                                                showGuestRegistrationPopup(
+                                                  context,
+                                                );
+                                                return;
+                                              }
+                                              _submitLessonRequest(
+                                                false,
+                                                customHourRange: gEvent['hour'],
+                                                specificType: 'Grup Dersi',
+                                                specificSport: gEvent['sport'],
+                                              );
+                                            },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: isFull
+                                            ? Colors.white10
+                                            : Colors.blueAccent,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isFull
+                                            ? "Kontenjan Dolu"
+                                            : "Hemen Katıl",
+                                        style: GoogleFonts.poppins(
+                                          color: isFull
+                                              ? Colors.white38
+                                              : Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          const SizedBox(height: 16),
+                          const Divider(color: Colors.white10),
+                          const SizedBox(height: 16),
+                        ],
+
+                        Text(
+                          "Özel Ders Talep Et",
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        Text(
+                          "Branş Seçin",
+                          style: GoogleFonts.poppins(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children:
+                              widget.coachData['specialties'] != null &&
+                                  (widget.coachData['specialties'] as List)
+                                      .isNotEmpty
+                              ? (widget.coachData['specialties'] as List).map((
+                                  s,
+                                ) {
+                                  final isSelected =
+                                      _selectedSport == s.toString();
+                                  return ChoiceChip(
+                                    label: Text(s.toString()),
+                                    selected: isSelected,
+                                    selectedColor: ColorConstants.primaryColor,
+                                    backgroundColor: Colors.white10,
+                                    labelStyle: GoogleFonts.poppins(
+                                      color: isSelected
+                                          ? Colors.black
+                                          : Colors.white,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                    onSelected: (val) {
+                                      if (val)
+                                        setState(
+                                          () => _selectedSport = s.toString(),
+                                        );
+                                    },
+                                  );
+                                }).toList()
+                              : [
+                                  ChoiceChip(
+                                    label: Text(
+                                      widget.coachData['lessonSport'] ??
+                                          'Genel',
+                                    ),
+                                    selected: true,
+                                    selectedColor: ColorConstants.primaryColor,
+                                    backgroundColor: Colors.white10,
+                                    labelStyle: GoogleFonts.poppins(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    onSelected: (val) {},
+                                  ),
+                                ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        if (data['isYellow']) ...[
+                          Text(
+                            "Aşağıdaki dolu saatler dışındaki zamanları seçebilirsiniz:",
+                            style: GoogleFonts.poppins(
+                              color: Colors.amber,
+                              fontSize: 11,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Wrap(
@@ -1526,19 +1673,7 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                                 .toList(),
                           ),
                           const SizedBox(height: 16),
-                          const Divider(color: Colors.white10),
-                          const SizedBox(height: 16),
                         ],
-
-                        Text(
-                          "Kendinize Uygun Saatleri Seçin",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
                         Row(
                           children: [
                             Expanded(
@@ -1628,10 +1763,9 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 16),
                         Text(
-                          "Ders Tipi",
+                          "Özel Ders Tipi",
                           style: GoogleFonts.poppins(
                             color: Colors.white70,
                             fontSize: 13,
@@ -1649,7 +1783,9 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                                 selectedColor: ColorConstants.primaryColor,
                                 backgroundColor: Colors.white10,
                                 labelStyle: GoogleFonts.poppins(
-                                  color: Colors.black,
+                                  color: isSelected
+                                      ? Colors.black
+                                      : Colors.white,
                                   fontWeight: isSelected
                                       ? FontWeight.bold
                                       : FontWeight.normal,
@@ -1662,7 +1798,6 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                             );
                           }).toList(),
                         ),
-
                         const SizedBox(height: 24),
                         Row(
                           children: [
@@ -1670,14 +1805,16 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                               flex: 3,
                               child: ScaleButton(
                                 onPressed: () {
-                                  // --- GÜVENLİK: MİSAFİRSE DERS ALAMAZ ---
                                   if (FirebaseAuth.instance.currentUser ==
                                       null) {
                                     showGuestRegistrationPopup(context);
                                     return;
                                   }
                                   if (!_isSubmitting)
-                                    _submitLessonRequest(false);
+                                    _submitLessonRequest(
+                                      false,
+                                      specificType: 'Özel Ders',
+                                    );
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
@@ -1726,7 +1863,6 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                               flex: 4,
                               child: ScaleButton(
                                 onPressed: () {
-                                  // --- GÜVENLİK: MİSAFİRSE DERS ALAMAZ ---
                                   if (FirebaseAuth.instance.currentUser ==
                                       null) {
                                     showGuestRegistrationPopup(context);

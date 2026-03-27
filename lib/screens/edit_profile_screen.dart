@@ -6,9 +6,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/constants/color_constants.dart';
+import '../core/utils/validators.dart'; // YENİ: Doğrulama kütüphanesi
 import '../widgets/custom_button.dart';
 import '../widgets/gradient_background.dart';
-import 'welcome_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -18,9 +18,7 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  // YENİ: KULLANICI ID'SİNİ GÜVENLİ (NULLABLE) HALE GETİRDİK
-  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
-
+  final String _uid = FirebaseAuth.instance.currentUser!.uid;
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -53,13 +51,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     "CrossFit",
     "Tenis",
   ];
-
   final List<String> _levelList = [
     "Yeni Başlayan",
     "Orta Seviye",
     "İleri Seviye",
   ];
-
   final List<String> _goalList = [
     "Kilo Vermek",
     "Kas Yapmak",
@@ -74,24 +70,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // YENİ: EĞER MİSAFİR DEĞİLSE VERİLERİ YÜKLE
-    if (FirebaseAuth.instance.currentUser != null) {
-      _loadUserData();
-    } else {
-      setState(() => _isLoading = false);
-    }
+    _loadUserData();
   }
 
-  // --- VERİLERİ ÇEK ---
   Future<void> _loadUserData() async {
-    if (_uid == null) return; // Güvenlik kontrolü
-
     try {
       DocumentSnapshot doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(_uid!)
+          .doc(_uid)
           .get();
-
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         setState(() {
@@ -105,12 +92,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             _heightController.text = data['height']?.toString() ?? '';
             _weightController.text = data['weight']?.toString() ?? '';
             _selectedSports = List<String>.from(data['interestedSports'] ?? []);
-
             String? fetchedLevel = data['experienceLevel'];
             _selectedLevel = _levelList.contains(fetchedLevel)
                 ? fetchedLevel
                 : null;
-
             String? fetchedGoal = data['goal'];
             _selectedGoal = _goalList.contains(fetchedGoal)
                 ? fetchedGoal
@@ -127,37 +112,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // --- FOTOĞRAF SEÇ ---
   Future<void> _pickImage() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.image,
       );
-
-      if (result != null) {
-        setState(() {
-          _selectedImage = File(result.files.single.path!);
-        });
-      }
+      if (result != null)
+        setState(() => _selectedImage = File(result.files.single.path!));
     } catch (e) {
       _showError("Fotoğraf seçilemedi: $e");
     }
   }
 
-  // --- PROFİLİ KAYDET ---
   Future<void> _saveProfile() async {
-    if (_uid == null) return; // Güvenlik kontrolü
+    // --- YENİ EKLENEN DOĞRULAMALAR ---
+    if (_userType == 'athlete') {
+      String? ageError = Validators.validateAge(_ageController.text);
+      if (ageError != null) return _showError(ageError);
+
+      String? heightError = Validators.validateHeight(_heightController.text);
+      if (heightError != null) return _showError(heightError);
+
+      String? weightError = Validators.validateWeight(_weightController.text);
+      if (weightError != null) return _showError(weightError);
+    }
 
     setState(() => _isSaving = true);
     try {
       String? newImageUrl = _profileImageUrl;
-
       if (_selectedImage != null) {
         final storageRef = FirebaseStorage.instance
             .ref()
             .child('profile_pictures')
             .child('$_uid.jpg');
-
         await storageRef.putFile(_selectedImage!);
         newImageUrl = await storageRef.getDownloadURL();
       }
@@ -181,7 +168,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       await FirebaseFirestore.instance
           .collection('users')
-          .doc(_uid!)
+          .doc(_uid)
           .update(updateData);
 
       if (mounted) {
@@ -195,6 +182,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
+        Navigator.pop(context);
       }
     } catch (e) {
       _showError("Profil kaydedilirken bir hata oluştu: $e");
@@ -215,97 +203,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 1. EĞER MİSAFİR İSE PROFİL OLUŞTURMA EKRANINI GÖSTER
-    if (FirebaseAuth.instance.currentUser == null) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF121212),
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          title: Text(
-            "Profilim",
-            style: GoogleFonts.poppins(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(30),
-                  decoration: BoxDecoration(
-                    color: ColorConstants.primaryColor.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.person_add_alt_1_rounded,
-                    size: 80,
-                    color: ColorConstants.primaryColor,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  "Kendi profilini oluştur ve hedeflerine ulaşmak için ilk adımı at!",
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ColorConstants.primaryColor,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Text(
-                    "Giriş Yap / Kayıt Ol",
-                    style: GoogleFonts.poppins(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // 2. MİSAFİR DEĞİLSE NORMAL PROFİL DÜZENLEME EKRANINI ÇİZ
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          backgroundColor: Colors.black.withOpacity(0.6),
+          backgroundColor: Colors.black,
           elevation: 0,
-          automaticallyImplyLeading: false,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
           title: Text(
-            "Profilim",
+            "Profili Düzenle",
             style: GoogleFonts.poppins(
               color: Colors.white,
-              fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -317,12 +231,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               )
             : SingleChildScrollView(
-                padding: EdgeInsets.only(
-                  top: MediaQuery.of(context).padding.top + kToolbarHeight + 24,
-                  left: 24,
-                  right: 24,
-                  bottom: 24,
-                ),
+                padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -452,13 +361,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               borderRadius: BorderRadius.circular(100),
                             ),
                             side: BorderSide.none,
-                            onSelected: (selected) {
-                              setState(() {
-                                selected
-                                    ? _selectedSports.add(sport)
-                                    : _selectedSports.remove(sport);
-                              });
-                            },
+                            onSelected: (selected) => setState(() {
+                              selected
+                                  ? _selectedSports.add(sport)
+                                  : _selectedSports.remove(sport);
+                            }),
                           );
                         }).toList(),
                       ),
@@ -471,7 +378,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         maxLines: 4,
                       ),
                     ],
-
                     const SizedBox(height: 40),
 
                     _isSaving
@@ -548,12 +454,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           vertical: 18,
         ),
       ),
-      items: items.map((item) {
-        return DropdownMenuItem(
-          value: item,
-          child: Text(item, overflow: TextOverflow.ellipsis),
-        );
-      }).toList(),
+      items: items
+          .map(
+            (item) => DropdownMenuItem(
+              value: item,
+              child: Text(item, overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
       onChanged: onChanged,
     );
   }

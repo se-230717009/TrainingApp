@@ -51,4 +51,49 @@ class Validators {
     }
     return null;
   }
+
+  // --- YENİ: YAŞ KONTROLÜ (12-100 Arası) ---
+  static String? validateAge(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Yaş bilgisi gerekli';
+    }
+    int? age = int.tryParse(value.trim());
+    if (age == null) {
+      return 'Lütfen geçerli bir yaş girin';
+    }
+    if (age < 12 || age > 100) {
+      return 'Yaş 12 ile 100 arasında olmalıdır';
+    }
+    return null;
+  }
+
+  // --- YENİ: BOY KONTROLÜ (100-250 cm Arası) ---
+  static String? validateHeight(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Boy bilgisi gerekli';
+    }
+    int? height = int.tryParse(value.trim());
+    if (height == null) {
+      return 'Lütfen geçerli bir boy (cm) girin';
+    }
+    if (height < 100 || height > 250) {
+      return 'Boy 100 ile 250 cm arasında olmalıdır';
+    }
+    return null;
+  }
+
+  // --- YENİ: KİLO KONTROLÜ (30-300 kg Arası) ---
+  static String? validateWeight(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Kilo bilgisi gerekli';
+    }
+    int? weight = int.tryParse(value.trim());
+    if (weight == null) {
+      return 'Lütfen geçerli bir kilo (kg) girin';
+    }
+    if (weight < 30 || weight > 300) {
+      return 'Kilo 30 ile 300 kg arasında olmalıdır';
+    }
+    return null;
+  }
 }

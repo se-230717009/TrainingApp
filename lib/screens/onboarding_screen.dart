@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
+import '../core/utils/validators.dart'; // YENİ: Doğrulama kütüphanesi eklendi
 import '../services/auth_service.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/scale_button.dart';
@@ -22,22 +23,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   int _currentIndex = 0;
   bool _isLoading = false;
 
-  // --- VERİLER ---
   String? _selectedGoal;
   List<String> _selectedSports = [];
   String? _coachingType;
+  String? _preferredLessonFormat;
   String? _gender;
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
   String? _experienceLevel;
-
-  // YENİ EKLENEN TERCİHLER
   String? _preferredCoachGender;
   List<String> _selectedDays = [];
   List<String> _selectedHours = [];
 
-  // FİYAT TAHMİNİ İÇİN
   int _minPrice = 0;
   int _maxPrice = 0;
 
@@ -83,7 +81,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     "İleri Seviye",
   ];
 
-  // SEÇİLEN SPORLARA GÖRE VERİTABANINDAN FİYAT HESAPLAMA
   Future<void> _calculateEstimatedPrice() async {
     if (_selectedSports.isEmpty) {
       setState(() {
@@ -92,14 +89,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       });
       return;
     }
-
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
           .where('userType', isEqualTo: 'coach')
           .where('lessonSport', whereIn: _selectedSports)
           .get();
-
       if (snapshot.docs.isNotEmpty) {
         List<int> prices = snapshot.docs
             .map((d) => (d.data()['hourlyRate'] ?? 0) as int)
@@ -114,7 +109,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           return;
         }
       }
-      // Antrenör yoksa standart piyasa fiyatı göster
       setState(() {
         _minPrice = 400;
         _maxPrice = 1500;
@@ -128,23 +122,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _nextPage() {
-    // Validasyonları kısa tutuyorum, mevcut yapınla aynı
     if (_currentIndex == 0 && _selectedGoal == null)
       return _showError("Hedef seçin.");
     if (_currentIndex == 1 && _selectedSports.isEmpty)
       return _showError("Branş seçin.");
     if (_currentIndex == 2 && _coachingType == null)
       return _showError("Çalışma tipi seçin.");
-    if (_currentIndex == 3 && (_gender == null || _ageController.text.isEmpty))
-      return _showError("Bilgileri girin.");
-    if (_currentIndex == 4 && _experienceLevel == null)
+    if (_currentIndex == 3 && _preferredLessonFormat == null)
+      return _showError("Ders formatı seçin.");
+
+    // --- YENİ EKLENEN DOĞRULAMA (VÜCUT ANALİZİ) ---
+    if (_currentIndex == 4) {
+      if (_gender == null) return _showError("Lütfen cinsiyetinizi seçin.");
+
+      String? ageError = Validators.validateAge(_ageController.text);
+      if (ageError != null) return _showError(ageError);
+
+      String? heightError = Validators.validateHeight(_heightController.text);
+      if (heightError != null) return _showError(heightError);
+
+      String? weightError = Validators.validateWeight(_weightController.text);
+      if (weightError != null) return _showError(weightError);
+    }
+
+    if (_currentIndex == 5 && _experienceLevel == null)
       return _showError("Deneyim seçin.");
-    if (_currentIndex == 5 &&
+    if (_currentIndex == 6 &&
         (_preferredCoachGender == null || _selectedDays.isEmpty))
       return _showError("Müsaitlik ve antrenör tercihini yapın.");
 
-    if (_currentIndex < 5) {
-      // 6 Adım oldu
+    if (_currentIndex < 6) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
@@ -170,14 +177,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'goal': _selectedGoal,
           'interestedSports': _selectedSports,
           'coachingType': _coachingType,
+          'preferredLessonFormat': _preferredLessonFormat,
           'gender': _gender,
-          'age': _ageController.text,
-          'height': _heightController.text,
-          'weight': _weightController.text,
+          'age': _ageController.text.trim(),
+          'height': _heightController.text.trim(),
+          'weight': _weightController.text.trim(),
           'experienceLevel': _experienceLevel,
           'preferredCoachGender': _preferredCoachGender,
           'availableDays': _selectedDays,
-          'availableHours': _selectedHours, // YENİ EKLENENLER
+          'availableHours': _selectedHours,
           'isOnboardingCompleted': true,
         },
       );
@@ -214,7 +222,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           SafeArea(
             child: Column(
               children: [
-                // FİYAT TAHMİNİ BARI (ARMUT TARZI)
                 if (_minPrice > 0)
                   Container(
                     margin: const EdgeInsets.symmetric(
@@ -253,8 +260,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ],
                     ),
                   ),
-
-                // İLERLEME ÇUBUĞU
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -264,7 +269,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     children: [
                       Expanded(
                         child: LinearProgressIndicator(
-                          value: (_currentIndex + 1) / 6,
+                          value: (_currentIndex + 1) / 7,
                           backgroundColor: Colors.white10,
                           color: ColorConstants.primaryColor,
                           minHeight: 6,
@@ -272,7 +277,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       const SizedBox(width: 15),
                       Text(
-                        "${_currentIndex + 1}/6",
+                        "${_currentIndex + 1}/7",
                         style: GoogleFonts.poppins(
                           color: Colors.white54,
                           fontWeight: FontWeight.bold,
@@ -281,7 +286,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ],
                   ),
                 ),
-
                 Expanded(
                   child: PageView(
                     controller: _pageController,
@@ -292,13 +296,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       _buildStep1Goal(),
                       _buildStep2Sports(),
                       _buildStep3CoachingType(),
+                      _buildStepLessonFormat(),
                       _buildStep4Stats(),
                       _buildStep5Experience(),
                       _buildStep6Preferences(),
                     ],
                   ),
                 ),
-
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                   child: _isLoading
@@ -306,7 +310,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           color: ColorConstants.primaryColor,
                         )
                       : CustomButton(
-                          text: _currentIndex == 5 ? "Tamamla" : "Devam Et",
+                          text: _currentIndex == 6 ? "Tamamla" : "Devam Et",
                           onPressed: _nextPage,
                         ),
                 ),
@@ -318,9 +322,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  // --- WIDGETS (Mevcutlar aynen kalıp 6. Adım eklendi) ---
   Widget _buildStep1Goal() {
-    /* Mevcut kodunuzla aynı */
     return _buildStepContainer(
       title: "Hedefin Ne?",
       subtitle: "Seni motive eden asıl sebep nedir?",
@@ -359,7 +361,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   selected
                       ? _selectedSports.add(sport)
                       : _selectedSports.remove(sport);
-                  _calculateEstimatedPrice(); /* FİYATI GÜNCELLE */
+                  _calculateEstimatedPrice();
                 });
               },
             );
@@ -390,12 +392,47 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             isSelected: _coachingType == "Birebir (Yüzyüze)",
             onTap: () => setState(() => _coachingType = "Birebir (Yüzyüze)"),
           ),
+          const SizedBox(height: 16),
           _buildSelectableCardWithIcon(
             text: "Farketmez",
             subtext: "Hem online hem yüzyüze çalışabilirim.",
             icon: Icons.compare_arrows_rounded,
             isSelected: _coachingType == "Farketmez",
             onTap: () => setState(() => _coachingType = "Farketmez"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepLessonFormat() {
+    return _buildStepContainer(
+      title: "Ders Formatı",
+      subtitle: "Eğitimlerini nasıl almak istiyorsun?",
+      child: Column(
+        children: [
+          _buildSelectableCardWithIcon(
+            text: "Özel Ders",
+            subtext: "Eğitmen ile birebir özel ders.",
+            icon: Icons.person,
+            isSelected: _preferredLessonFormat == "Özel Ders",
+            onTap: () => setState(() => _preferredLessonFormat = "Özel Ders"),
+          ),
+          const SizedBox(height: 16),
+          _buildSelectableCardWithIcon(
+            text: "Grup Dersi",
+            subtext: "Küçük gruplar halinde motivasyonlu ders.",
+            icon: Icons.groups,
+            isSelected: _preferredLessonFormat == "Grup Dersi",
+            onTap: () => setState(() => _preferredLessonFormat = "Grup Dersi"),
+          ),
+          const SizedBox(height: 16),
+          _buildSelectableCardWithIcon(
+            text: "İkisi de",
+            subtext: "İki formata da açığım.",
+            icon: Icons.all_inclusive_rounded,
+            isSelected: _preferredLessonFormat == "İkisi de",
+            onTap: () => setState(() => _preferredLessonFormat = "İkisi de"),
           ),
         ],
       ),
@@ -460,7 +497,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  // YENİ EKLENEN 6. ADIM: Müsaitlik ve Antrenör Tercihi
   Widget _buildStep6Preferences() {
     return _buildStepContainer(
       title: "Zaman ve Tercih",
@@ -563,7 +599,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  // --- YARDIMCI WIDGET'LAR ---
   Widget _buildStepContainer({
     required String title,
     required String subtitle,

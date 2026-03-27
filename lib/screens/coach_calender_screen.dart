@@ -4,15 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/scale_button.dart';
 import '../widgets/gradient_background.dart';
 
-// ============================================================================
-// 1. ANA TAKVİM EKRANI (CoachCalendarScreen)
-// ============================================================================
 class CoachCalendarScreen extends StatefulWidget {
   const CoachCalendarScreen({super.key});
 
@@ -104,7 +102,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
   List<dynamic> _getEventsForDay(DateTime day) {
     String dayName = _getWeekdayString(day.weekday);
     String dateStr = DateFormat('yyyy-MM-dd').format(day);
-
     bool hasBusy =
         _activities.any(
           (a) => a['date'] == dateStr && (a['isUnavailable'] == true),
@@ -137,11 +134,11 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true, // PANELİM İLE AYNI YAPI
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          backgroundColor: Colors.black.withOpacity(0.6), // ŞEFFAF SİYAH
+          backgroundColor: Colors.black.withOpacity(0.6),
           elevation: 0,
-          automaticallyImplyLeading: false, // GERİ TUŞU KALDIRILDI
+          automaticallyImplyLeading: false,
           title: Text(
             "Takvimim",
             style: GoogleFonts.poppins(
@@ -151,7 +148,6 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
             ),
           ),
         ),
-
         floatingActionButton: _selectedDay != null
             ? ScaleButton(
                 onPressed: () {
@@ -201,10 +197,8 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                 ),
               )
             : null,
-
         body: Column(
           children: [
-            // APPBAR ALTINDA EZİLMEMESİ İÇİN DİNAMİK BOŞLUK
             SizedBox(
               height: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
             ),
@@ -331,13 +325,9 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
   }
 }
 
-// ============================================================================
-// 2. GÜNLÜK DETAY VE SAATLİK GÖRÜNÜM EKRANI (İÇ SAYFA)
-// ============================================================================
 class CoachDayDetailsScreen extends StatefulWidget {
   final DateTime selectedDate;
   const CoachDayDetailsScreen({super.key, required this.selectedDate});
-
   @override
   State<CoachDayDetailsScreen> createState() => _CoachDayDetailsScreenState();
 }
@@ -349,17 +339,41 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
   List<Map<String, dynamic>> _routines = [];
   StreamSubscription? _lessonsSub, _activitiesSub, _routinesSub;
 
+  // Hocanın uzmanlık alanları (Branş seçimi için)
+  List<String> _coachSpecialties = ['Genel'];
+
   @override
   void initState() {
     super.initState();
     _setupStreams();
+    _fetchCoachSpecialties();
+  }
+
+  Future<void> _fetchCoachSpecialties() async {
+    final uid = _auth.currentUser!.uid;
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+    if (doc.exists && mounted) {
+      final data = doc.data() as Map<String, dynamic>;
+      List<dynamic> specs = data['specialties'] ?? [];
+      if (specs.isNotEmpty) {
+        setState(() {
+          _coachSpecialties = specs.map((e) => e.toString()).toList();
+        });
+      } else if (data['lessonSport'] != null) {
+        setState(() {
+          _coachSpecialties = [data['lessonSport']];
+        });
+      }
+    }
   }
 
   void _setupStreams() {
     final String uid = _auth.currentUser!.uid;
     String dayName = _getWeekdayString(widget.selectedDate.weekday);
     String dateStr = DateFormat('yyyy-MM-dd').format(widget.selectedDate);
-
     _lessonsSub = FirebaseFirestore.instance
         .collection('lessons')
         .where('coachId', isEqualTo: uid)
@@ -434,7 +448,6 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
   List<Map<String, dynamic>> _getEventsForHour(int hour) {
     List<Map<String, dynamic>> events = [];
     String hourStr = hour.toString().padLeft(2, '0');
-
     for (var act in _activities) {
       if (act['hour'] != null && act['hour'].toString().startsWith(hourStr))
         events.add({...act, 'type': 'activity'});
@@ -454,6 +467,7 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
 
   void _showEventDetailsModal(Map<String, dynamic> event) {
     bool isLesson = event['type'] == 'lesson';
+    bool isGroupLesson = event['isGroupLesson'] == true;
     bool isUnavail = event['isUnavailable'] == true;
     String title = event['title'] ?? event['athleteName'] ?? 'Etkinlik';
     String time =
@@ -464,6 +478,17 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
         (isLesson
             ? "${event['sport']} Dersi"
             : (isUnavail ? "Zaman Kapatıldı" : ""));
+
+    int currentEnrolled = event['currentEnrolled'] ?? 0;
+    int totalEnrolled =
+        currentEnrolled +
+        _lessons
+            .where(
+              (l) =>
+                  l['lessonType'] == 'Grup Dersi' &&
+                  (l['hours'] as List).contains(event['hour']),
+            )
+            .length;
 
     showModalBottomSheet(
       context: context,
@@ -526,8 +551,49 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                     ),
                   ),
                 ],
+                if (isGroupLesson) ...[
+                  if (event['sport'] != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      "Branş: ${event['sport']}",
+                      style: GoogleFonts.poppins(
+                        color: Colors.blueAccent,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blueAccent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.blueAccent.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.groups_rounded,
+                          color: Colors.blueAccent,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Mevcut: $totalEnrolled / ${event['maxCapacity'] ?? '-'}",
+                          style: GoogleFonts.poppins(
+                            color: Colors.blueAccent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 30),
-
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -550,15 +616,14 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                               .doc(docId)
                               .delete();
                         }
-
                         if (mounted) {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
                                 isLesson
-                                    ? "Ders başarıyla iptal edildi."
-                                    : "Etkinlik başarıyla kaldırıldı.",
+                                    ? "Ders iptal edildi."
+                                    : "Etkinlik kaldırıldı.",
                                 style: GoogleFonts.poppins(),
                               ),
                               backgroundColor: Colors.green,
@@ -609,6 +674,8 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
   void _showAdvancedActivityModal() {
     final titleController = TextEditingController();
     final descController = TextEditingController();
+    final currentEnrolledCtrl = TextEditingController(text: "0");
+    final maxCapacityCtrl = TextEditingController(text: "10");
 
     String recurrenceType = 'Tek Seferlik';
     String startTime = "09:00";
@@ -617,8 +684,15 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
       _getWeekdayString(widget.selectedDate.weekday),
     ];
     bool isUnavailable = false;
+    bool isGroupLesson = false;
     DateTime? endDate;
     bool isSubmitting = false;
+
+    // Güvenli Branş Seçimi
+    List<String> sportItems = _coachSpecialties.isNotEmpty
+        ? _coachSpecialties
+        : ['Genel'];
+    String selectedSport = sportItems.first;
 
     final List<String> daysList = [
       "Pazartesi",
@@ -691,7 +765,6 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                       "Başlık (Örn: Özel Antrenman)",
                     ),
                     const SizedBox(height: 12),
-
                     Row(
                       children: [
                         Expanded(
@@ -716,6 +789,105 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                     const SizedBox(height: 20),
                     const Divider(color: Colors.white10),
                     const SizedBox(height: 12),
+
+                    // --- YENİ: GRUP DERSİ SEÇENEĞİ ---
+                    SwitchListTile(
+                      title: Text(
+                        "Bu bir Grup Dersi mi?",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: Text(
+                        "Birden fazla öğrencinin katılabileceği kontenjanlı sınıf.",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white54,
+                          fontSize: 11,
+                        ),
+                      ),
+                      value: isGroupLesson,
+                      activeColor: Colors.blueAccent,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (val) => setModalState(() {
+                        isGroupLesson = val;
+                        if (val) isUnavailable = false;
+                      }),
+                    ),
+                    if (isGroupLesson) ...[
+                      const SizedBox(height: 12),
+                      _buildDropdown(
+                        "Branş",
+                        selectedSport,
+                        sportItems,
+                        (v) => setModalState(() => selectedSport = v!),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: currentEnrolledCtrl,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              style: GoogleFonts.poppins(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: "Kayıtlı Sayısı (Dışarıdan)",
+                                labelStyle: GoogleFonts.poppins(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                                filled: true,
+                                fillColor: Colors.white10,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: maxCapacityCtrl,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              style: GoogleFonts.poppins(color: Colors.white),
+                              decoration: InputDecoration(
+                                labelText: "Toplam Mevcut",
+                                labelStyle: GoogleFonts.poppins(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                                filled: true,
+                                fillColor: Colors.white10,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Not: Uygulama üzerinden onayladığınız öğrenciler 'Kayıtlı Sayısı'na otomatik olarak eklenecektir.",
+                        style: GoogleFonts.poppins(
+                          color: Colors.blueAccent,
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Divider(color: Colors.white10),
+                      const SizedBox(height: 12),
+                    ],
 
                     Text(
                       "Tekrar Modeli",
@@ -749,7 +921,6 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                       }).toList(),
                     ),
                     const SizedBox(height: 16),
-
                     if (recurrenceType == 'Haftalık') ...[
                       Text(
                         "Tekrar Günleri",
@@ -782,7 +953,6 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                         }).toList(),
                       ),
                       const SizedBox(height: 16),
-
                       Text(
                         "Tekrar Bitiş Tarihi",
                         style: GoogleFonts.poppins(
@@ -880,74 +1050,75 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    const Divider(color: Colors.white10),
-                    const SizedBox(height: 12),
-
-                    GestureDetector(
-                      onTap: () =>
-                          setModalState(() => isUnavailable = !isUnavailable),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isUnavailable
-                              ? Colors.redAccent.withOpacity(0.1)
-                              : Colors.white.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
+                    if (!isGroupLesson) ...[
+                      const Divider(color: Colors.white10),
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: () =>
+                            setModalState(() => isUnavailable = !isUnavailable),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
                             color: isUnavailable
-                                ? Colors.redAccent.withOpacity(0.5)
-                                : Colors.white10,
+                                ? Colors.redAccent.withOpacity(0.1)
+                                : Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isUnavailable
+                                  ? Colors.redAccent.withOpacity(0.5)
+                                  : Colors.white10,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.block_rounded,
+                                color: isUnavailable
+                                    ? Colors.redAccent
+                                    : Colors.white54,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Zamanı Kapat (Meşgul)",
+                                      style: GoogleFonts.poppins(
+                                        color: isUnavailable
+                                            ? Colors.redAccent
+                                            : Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      "Öğrenciler bu saatlere ders alamaz.",
+                                      style: GoogleFonts.poppins(
+                                        color: Colors.white54,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: isUnavailable,
+                                onChanged: (v) =>
+                                    setModalState(() => isUnavailable = v),
+                                activeColor: Colors.redAccent,
+                                inactiveTrackColor: Colors.white10,
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.block_rounded,
-                              color: isUnavailable
-                                  ? Colors.redAccent
-                                  : Colors.white54,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Zamanı Kapat (Meşgul)",
-                                    style: GoogleFonts.poppins(
-                                      color: isUnavailable
-                                          ? Colors.redAccent
-                                          : Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  Text(
-                                    "Öğrenciler bu saatlere ders alamaz.",
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white54,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch(
-                              value: isUnavailable,
-                              onChanged: (v) =>
-                                  setModalState(() => isUnavailable = v),
-                              activeColor: Colors.redAccent,
-                              inactiveTrackColor: Colors.white10,
-                            ),
-                          ],
-                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 24),
+                    ],
 
                     SizedBox(
                       width: double.infinity,
@@ -961,41 +1132,42 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                                 try {
                                   String formattedHour =
                                       "$startTime - $endTime";
+                                  Map<String, dynamic> actData = {
+                                    'coachId': _auth.currentUser!.uid,
+                                    'title': titleController.text.trim(),
+                                    'description': descController.text.trim(),
+                                    'hour': formattedHour,
+                                    'isUnavailable': isUnavailable,
+                                    'isGroupLesson': isGroupLesson,
+                                    if (isGroupLesson) 'sport': selectedSport,
+                                    'currentEnrolled':
+                                        int.tryParse(
+                                          currentEnrolledCtrl.text,
+                                        ) ??
+                                        0,
+                                    'maxCapacity':
+                                        int.tryParse(maxCapacityCtrl.text) ??
+                                        10,
+                                    'createdAt': FieldValue.serverTimestamp(),
+                                  };
+
                                   if (recurrenceType == 'Tek Seferlik') {
+                                    actData['date'] = DateFormat(
+                                      'yyyy-MM-dd',
+                                    ).format(widget.selectedDate);
                                     await FirebaseFirestore.instance
                                         .collection('coach_manual_activities')
-                                        .add({
-                                          'coachId': _auth.currentUser!.uid,
-                                          'date': DateFormat(
-                                            'yyyy-MM-dd',
-                                          ).format(widget.selectedDate),
-                                          'title': titleController.text.trim(),
-                                          'description': descController.text
-                                              .trim(),
-                                          'hour': formattedHour,
-                                          'isUnavailable': isUnavailable,
-                                          'createdAt':
-                                              FieldValue.serverTimestamp(),
-                                        });
+                                        .add(actData);
                                   } else {
+                                    actData['days'] = selectedDays;
+                                    actData['endDate'] = endDate != null
+                                        ? DateFormat(
+                                            'yyyy-MM-dd',
+                                          ).format(endDate!)
+                                        : null;
                                     await FirebaseFirestore.instance
                                         .collection('coach_routines')
-                                        .add({
-                                          'coachId': _auth.currentUser!.uid,
-                                          'days': selectedDays,
-                                          'title': titleController.text.trim(),
-                                          'description': descController.text
-                                              .trim(),
-                                          'hour': formattedHour,
-                                          'endDate': endDate != null
-                                              ? DateFormat(
-                                                  'yyyy-MM-dd',
-                                                ).format(endDate!)
-                                              : null,
-                                          'isUnavailable': isUnavailable,
-                                          'createdAt':
-                                              FieldValue.serverTimestamp(),
-                                        });
+                                        .add(actData);
                                   }
                                   if (mounted) {
                                     Navigator.pop(ctx);
@@ -1091,6 +1263,10 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
     List<String> items,
     Function(String?) onChanged,
   ) {
+    List<String> uniqueItems = items.toSet().toList();
+    if (uniqueItems.isEmpty) uniqueItems.add("Genel");
+    String safeValue = uniqueItems.contains(value) ? value : uniqueItems.first;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1107,7 +1283,7 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: value,
+              value: safeValue,
               isExpanded: true,
               dropdownColor: const Color(0xFF1E1E1E),
               icon: const Icon(
@@ -1116,7 +1292,7 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                 size: 18,
               ),
               style: GoogleFonts.poppins(color: Colors.white),
-              items: items
+              items: uniqueItems
                   .map((i) => DropdownMenuItem(value: i, child: Text(i)))
                   .toList(),
               onChanged: onChanged,
@@ -1178,7 +1354,7 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        "Aktivite Ekle",
+                        "Aktivite / Grup Dersi Ekle",
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
@@ -1233,17 +1409,31 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                                 ? const SizedBox(height: 40)
                                 : Column(
                                     children: hourEvents.map((event) {
+                                      bool isGroupLesson =
+                                          event['isGroupLesson'] == true;
                                       bool isUnavail =
                                           event['isUnavailable'] == true;
-                                      Color cardColor =
-                                          event['type'] == 'lesson'
-                                          ? ColorConstants.primaryColor
-                                          : (isUnavail
-                                                ? Colors.redAccent
-                                                : Colors.orange);
-                                      if (event['type'] == 'routine' &&
-                                          !isUnavail)
-                                        cardColor = Colors.blueAccent;
+                                      Color cardColor = isGroupLesson
+                                          ? Colors.blueAccent
+                                          : (event['type'] == 'lesson'
+                                                ? ColorConstants.primaryColor
+                                                : (isUnavail
+                                                      ? Colors.redAccent
+                                                      : Colors.orange));
+
+                                      int totalEnrolled =
+                                          (event['currentEnrolled'] ?? 0) +
+                                          _lessons
+                                              .where(
+                                                (l) =>
+                                                    l['lessonType'] ==
+                                                        'Grup Dersi' &&
+                                                    (l['hours'] as List)
+                                                        .contains(
+                                                          event['hour'],
+                                                        ),
+                                              )
+                                              .length;
 
                                       return ScaleButton(
                                         onPressed: () =>
@@ -1265,13 +1455,16 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                                           child: Row(
                                             children: [
                                               Icon(
-                                                isUnavail
-                                                    ? Icons.block_rounded
-                                                    : (event['type'] == 'lesson'
-                                                          ? Icons
-                                                                .fitness_center_rounded
-                                                          : Icons
-                                                                .event_note_rounded),
+                                                isGroupLesson
+                                                    ? Icons.groups_rounded
+                                                    : (isUnavail
+                                                          ? Icons.block_rounded
+                                                          : (event['type'] ==
+                                                                    'lesson'
+                                                                ? Icons
+                                                                      .fitness_center_rounded
+                                                                : Icons
+                                                                      .event_note_rounded)),
                                                 color: cardColor,
                                                 size: 18,
                                               ),
@@ -1307,6 +1500,52 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                                                               fontSize: 11,
                                                             ),
                                                       ),
+                                                    if (isGroupLesson) ...[
+                                                      if (event['sport'] !=
+                                                          null) ...[
+                                                        const SizedBox(
+                                                          height: 4,
+                                                        ),
+                                                        Text(
+                                                          "Branş: ${event['sport']}",
+                                                          style:
+                                                              GoogleFonts.poppins(
+                                                                color: Colors
+                                                                    .white70,
+                                                                fontSize: 11,
+                                                              ),
+                                                        ),
+                                                      ],
+                                                      const SizedBox(height: 4),
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 6,
+                                                              vertical: 2,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors
+                                                              .blueAccent
+                                                              .withOpacity(0.2),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                4,
+                                                              ),
+                                                        ),
+                                                        child: Text(
+                                                          "Mevcut: $totalEnrolled / ${event['maxCapacity'] ?? '-'}",
+                                                          style:
+                                                              GoogleFonts.poppins(
+                                                                color: Colors
+                                                                    .blueAccent,
+                                                                fontSize: 10,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ],
                                                 ),
                                               ),

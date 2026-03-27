@@ -1,4 +1,4 @@
-// ignore_for_file: unused_field, unused_element, unused_local_variable
+// ignore_for_file: unused_field, unused_element
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,11 +8,13 @@ import '../core/constants/color_constants.dart';
 import '../services/auth_service.dart';
 import '../widgets/scale_button.dart';
 import 'welcome_screen.dart';
+import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'my_lessons_screen.dart';
 import 'coach_detail_screen.dart';
+import 'athlete_messages_screen.dart'; // YENİ EKLENDİ
+import 'athlete_notifications_screen.dart'; // YENİ EKLENDİ
 import 'dart:async';
-import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,7 +25,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
-  // KULLANICI GİRİŞ YAPMAMIŞ OLABİLİR (MİSAFİR MODU)
   final User? _currentUser = FirebaseAuth.instance.currentUser;
   bool get _isGuest => _currentUser == null;
 
@@ -36,72 +37,22 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> _availableDays = [];
   List<String> _availableHours = [];
 
-  StreamSubscription<QuerySnapshot>? _lessonsSubscription;
-  StreamSubscription<QuerySnapshot>? _allLessonsSubscription;
-  List<String> _bookedCoachIds = [];
-  Set<String> _anyoneBookedCoachIds = {};
-
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
   RangeValues _priceRange = const RangeValues(0, 3000);
   String? _filterDeliveryMode;
   bool _sortByCheapest = false;
 
-  String? _filterSport;
-  String? _filterGender;
-  String? _filterCity;
-  List<String> _filterDays = [];
-  List<String> _filterHours = [];
-
   @override
   void initState() {
     super.initState();
     if (!_isGuest) {
       _loadAthleteData();
-      _listenToBookedLessons();
     }
-  }
-
-  void _listenToBookedLessons() {
-    _lessonsSubscription = FirebaseFirestore.instance
-        .collection('lessons')
-        .where('athleteId', isEqualTo: _currentUser!.uid)
-        .snapshots()
-        .listen((snapshot) {
-          if (mounted)
-            setState(
-              () => _bookedCoachIds = snapshot.docs
-                  .where(
-                    (doc) =>
-                        doc['status'] == 'pending' ||
-                        doc['status'] == 'approved',
-                  )
-                  .map((doc) => doc['coachId'] as String)
-                  .toList(),
-            );
-        });
-    _allLessonsSubscription = FirebaseFirestore.instance
-        .collection('lessons')
-        .snapshots()
-        .listen((snapshot) {
-          if (mounted)
-            setState(
-              () => _anyoneBookedCoachIds = snapshot.docs
-                  .where(
-                    (doc) =>
-                        doc['status'] == 'pending' ||
-                        doc['status'] == 'approved',
-                  )
-                  .map((doc) => doc['coachId'] as String)
-                  .toSet(),
-            );
-        });
   }
 
   @override
   void dispose() {
-    _lessonsSubscription?.cancel();
-    _allLessonsSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -125,9 +76,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   int _calculateMatchScore(Map<String, dynamic> coach) {
-    if (_isGuest) return 0; // Misafire eşleşme skoru hesaplanmaz
+    if (_isGuest) return 0;
     int score = 0;
     String idealCoachCharacter = "";
+
     switch (_athleteGoal) {
       case "Kilo Vermek":
         idealCoachCharacter = "Motivatör & Enerjik";
@@ -148,16 +100,33 @@ class _HomeScreenState extends State<HomeScreen> {
     if (coach['coachCharacter'] == idealCoachCharacter) score += 20;
     if (_preferredGender != "Farketmez" && coach['gender'] == _preferredGender)
       score += 10;
-    List<String> coachDays = List<String>.from(coach['availableDays'] ?? []);
-    score += coachDays.where((d) => _availableDays.contains(d)).length;
-    List<String> coachHours = List<String>.from(coach['availableHours'] ?? []);
-    score += coachHours.where((h) => _availableHours.contains(h)).length;
+
+    Map<String, dynamic>? dayHoursMap = coach['dayHoursMap'];
+    if (dayHoursMap != null) {
+      int timeScore = 0;
+      for (String athDay in _availableDays) {
+        if (dayHoursMap.containsKey(athDay)) {
+          List<dynamic> coachHoursForDay = dayHoursMap[athDay] ?? [];
+          for (String athHour in _availableHours) {
+            if (coachHoursForDay.contains(athHour)) {
+              timeScore += 5;
+            }
+          }
+        }
+      }
+      score += timeScore;
+    } else {
+      List<String> coachDays = List<String>.from(coach['availableDays'] ?? []);
+      score += coachDays.where((d) => _availableDays.contains(d)).length;
+      List<String> coachHours = List<String>.from(
+        coach['availableHours'] ?? [],
+      );
+      score += coachHours.where((h) => _availableHours.contains(h)).length;
+    }
+
     return score;
   }
 
-  int _calculateMaxScore() => 37;
-
-  // --- SEKMELER (TABS) ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,17 +136,14 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildDiscoverTab(),
           const MyLessonsScreen(),
+          // YENİ: MİSAFİR DEĞİLSE GERÇEK MESAJLAR EKRANINI GÖSTER
           _isGuest
               ? _buildGuestTab(
                   "Mesajlarım",
                   "Hocalarla iletişime geçip derslerinize başlamak için hemen kayıt ol.",
                   Icons.chat_bubble_outline_rounded,
                 )
-              : _buildPlaceholderTab(
-                  "Mesajlarım",
-                  "Mesajlaşma özelliği yapım aşamasındadır.",
-                  Icons.chat_bubble_outline_rounded,
-                ),
+              : const AthleteMessagesScreen(),
           const EditProfileScreen(),
           _buildSettingsTab(),
         ],
@@ -194,7 +160,11 @@ class _HomeScreenState extends State<HomeScreen> {
           showSelectedLabels: true,
           showUnselectedLabels: true,
           currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
+          onTap: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
           selectedLabelStyle: GoogleFonts.poppins(
             fontSize: 10,
             fontWeight: FontWeight.bold,
@@ -232,7 +202,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- SEKME 1: KEŞFET ---
   Widget _buildDiscoverTab() {
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -254,10 +223,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ? Padding(
                   padding: const EdgeInsets.only(right: 16.0),
                   child: TextButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const WelcomeScreen(),
+                        ),
+                      );
+                    },
                     style: TextButton.styleFrom(
                       backgroundColor: ColorConstants.primaryColor.withOpacity(
                         0.15,
@@ -280,7 +253,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 )
               : ScaleButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // YENİ: BİLDİRİMLER EKRANINA GİT
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AthleteNotificationsScreen(),
+                      ),
+                    );
+                  },
                   child: Stack(
                     alignment: Alignment.topRight,
                     children: [
@@ -298,18 +279,36 @@ class _HomeScreenState extends State<HomeScreen> {
                           size: 24,
                         ),
                       ),
-                      Positioned(
-                        right: 18,
-                        top: 2,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.black, width: 2),
-                          ),
-                        ),
+                      // YENİ: OKUNMAMIŞ BİLDİRİM VARSA KIRMIZI NOKTA GÖSTER
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(_currentUser!.uid)
+                            .collection('notifications')
+                            .where('isRead', isEqualTo: false)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData &&
+                              snapshot.data!.docs.isNotEmpty) {
+                            return Positioned(
+                              right: 18,
+                              top: 2,
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.black,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
                       ),
                     ],
                   ),
@@ -353,8 +352,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: TextField(
                         controller: _searchController,
-                        onChanged: (val) =>
-                            setState(() => _searchQuery = val.toLowerCase()),
+                        onChanged: (val) {
+                          setState(() {
+                            _searchQuery = val.toLowerCase();
+                          });
+                        },
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 14,
@@ -386,19 +388,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildQuickChip(
                     "Online",
                     _filterDeliveryMode == "Online",
-                    () => setState(() => _filterDeliveryMode = "Online"),
+                    () {
+                      setState(() {
+                        _filterDeliveryMode = "Online";
+                      });
+                    },
                   ),
                   _buildQuickChip(
                     "Yüzyüze",
                     _filterDeliveryMode == "Yüzyüze",
-                    () => setState(() => _filterDeliveryMode = "Yüzyüze"),
+                    () {
+                      setState(() {
+                        _filterDeliveryMode = "Yüzyüze";
+                      });
+                    },
                   ),
-                  _buildQuickChip(
-                    "En Ucuz",
-                    _sortByCheapest,
-                    () => setState(() => _sortByCheapest = !_sortByCheapest),
-                    icon: Icons.local_offer_rounded,
-                  ),
+                  _buildQuickChip("En Ucuz", _sortByCheapest, () {
+                    setState(() {
+                      _sortByCheapest = !_sortByCheapest;
+                    });
+                  }, icon: Icons.local_offer_rounded),
                 ],
               ),
             ),
@@ -439,7 +448,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               .toString()
                               .toLowerCase()
                         : "";
-                    final price = coach['hourlyRate'] ?? 0;
                     final mode = coach['deliveryMode'] ?? "";
 
                     bool matchesSearch =
@@ -568,7 +576,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- MİSAFİRLER İÇİN GAZA GETİRİCİ TAB GÖRÜNÜMÜ ---
   Widget _buildGuestTab(String title, String message, IconData icon) {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -611,10 +618,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 30),
               ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: ColorConstants.primaryColor,
                   padding: const EdgeInsets.symmetric(
@@ -641,7 +650,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- DİĞER FONKSİYONLAR (Aynı) ---
   Widget _buildSettingsTab() {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -672,22 +680,21 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!_isGuest)
             _buildMenuItem(Icons.logout, "Çıkış Yap", () async {
               await _authService.signOut();
-              if (mounted)
+              if (mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                   (route) => false,
                 );
+              }
             }, isDestructive: true),
           if (_isGuest)
-            _buildMenuItem(
-              Icons.login,
-              "Giriş Yap",
-              () => Navigator.push(
+            _buildMenuItem(Icons.login, "Giriş Yap", () {
+              Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-              ),
-            ),
+              );
+            }),
         ],
       ),
     );
@@ -817,39 +824,29 @@ class _HomeScreenState extends State<HomeScreen> {
     final String lessonSport = coachData['lessonSport'] ?? 'Genel Antrenman';
     final List<dynamic> daysList = coachData['availableDays'] ?? [];
     final List<dynamic> hoursList = coachData['availableHours'] ?? [];
-    final String coachUid = coachData['uid'] ?? '';
 
-    final bool isMyBooking = _bookedCoachIds.contains(coachUid);
-    final bool isAnyoneBooked =
-        _anyoneBookedCoachIds.contains(coachUid) && !isMyBooking;
     final bool isHighMatch = matchPercent >= 20;
 
     return ScaleButton(
-      onPressed: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CoachDetailScreen(coachData: coachData),
-        ),
-      ),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CoachDetailScreen(coachData: coachData),
+          ),
+        );
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isMyBooking
-              ? Colors.green.withOpacity(0.05)
-              : (isAnyoneBooked
-                    ? Colors.redAccent.withOpacity(0.04)
-                    : (isHighMatch
-                          ? ColorConstants.primaryColor.withOpacity(0.04)
-                          : Colors.white.withOpacity(0.05))),
+          color: isHighMatch
+              ? ColorConstants.primaryColor.withOpacity(0.04)
+              : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isMyBooking
-                ? Colors.green.withOpacity(0.3)
-                : (isAnyoneBooked
-                      ? Colors.redAccent.withOpacity(0.6)
-                      : (isHighMatch
-                            ? ColorConstants.primaryColor.withOpacity(0.5)
-                            : Colors.white10)),
+            color: isHighMatch
+                ? ColorConstants.primaryColor.withOpacity(0.5)
+                : Colors.white10,
           ),
         ),
         child: Column(
@@ -897,11 +894,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (isMyBooking)
-                      _badge("✅ Alındı", Colors.green)
-                    else if (isAnyoneBooked)
-                      _badge("Ders Alındı", Colors.redAccent)
-                    else if (isHighMatch)
+                    if (isHighMatch)
                       _badge("Kriterlerine Uygun", ColorConstants.primaryColor),
                     if (hourlyRate > 0) ...[
                       const SizedBox(height: 4),

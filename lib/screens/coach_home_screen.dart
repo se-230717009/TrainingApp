@@ -23,7 +23,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
   final AuthService _authService = AuthService();
   final String _uid = FirebaseAuth.instance.currentUser!.uid;
 
-  // --- ALT MENÜ DURUMU ---
   int _selectedIndex = 0;
 
   void _signOut() async {
@@ -37,7 +36,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     }
   }
 
-  // --- SEKMELER (TABS) ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -102,7 +100,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 
-  // --- SEKME 1: PANELİM ---
   Widget _buildDashboardTab() {
     return GradientBackground(
       child: Scaffold(
@@ -216,79 +213,10 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             );
           },
         ),
-        floatingActionButton: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .doc(_uid)
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData || !snapshot.data!.exists)
-              return const SizedBox.shrink();
-            final data = snapshot.data!.data() as Map<String, dynamic>;
-            final bool isVerified =
-                data['isApproved'] ?? data['isVerified'] ?? false;
-            if (!isVerified) return const SizedBox.shrink();
-
-            return ScaleButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      "Ders ekleme ekranı yakında gelecek!",
-                      style: GoogleFonts.poppins(),
-                    ),
-                    backgroundColor: ColorConstants.primaryColor,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: ColorConstants.primaryColor,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: ColorConstants.primaryColor.withOpacity(0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "Yeni Ders Ekle",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
       ),
     );
   }
 
-  // --- SEKME 5: AYARLAR ---
   Widget _buildSettingsTab() {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -327,7 +255,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 
-  // --- YARDIMCI WIDGET'LAR ---
   Widget _buildProfilePreview(Map<String, dynamic> data) {
     final String fullName =
         "${data['name'] ?? ''} ${data['surname'] ?? ''}".trim().isEmpty
@@ -588,7 +515,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              isVerified ? "Henüz Ders Eklemediniz" : "Onay Bekleniyor",
+              isVerified ? "Profiliniz Aktif" : "Onay Bekleniyor",
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 color: Colors.white,
@@ -599,8 +526,8 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             const SizedBox(height: 12),
             Text(
               isVerified
-                  ? "İlk dersinizi ekleyin ve öğrencilerle buluşmaya başlayın! Sağ alttaki butona dokunarak başlayabilirsiniz."
-                  : "Profiliniz onaylandıktan sonra burada ders ve paketlerinizi yönetebileceksiniz.",
+                  ? "Öğrenciler artık profilinizi görebilir ve sizden ders talep edebilir."
+                  : "Profiliniz onaylandıktan sonra öğrencileriniz sizinle iletişime geçebilecek.",
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 color: Colors.white54,

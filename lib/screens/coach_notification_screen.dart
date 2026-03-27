@@ -15,10 +15,32 @@ class CoachNotificationsScreen extends StatefulWidget {
 class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  void _updateLessonStatus(String docId, String status) async {
+  // YENİ: Fonksiyon artık lessonData'yı da alıyor ki öğrencinin bilgilerine erişebilsin
+  void _updateLessonStatus(
+    String docId,
+    String status,
+    Map<String, dynamic> lessonData,
+  ) async {
+    // 1. Dersin durumunu güncelle
     await FirebaseFirestore.instance.collection('lessons').doc(docId).update({
       'status': status,
     });
+
+    // 2. EĞER ONAYLANDIYSA ÖĞRENCİYE BİLDİRİM GÖNDER
+    if (status == 'approved') {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(lessonData['athleteId']) // Bildirimi öğrenciye atıyoruz
+          .collection('notifications')
+          .add({
+            'title': 'Dersiniz Onaylandı! 🎉',
+            'body':
+                '${lessonData['coachName']} ile olan ${lessonData['sport']} dersiniz onaylandı. Derslerim sekmesinden detayları ve takvimi kontrol edebilirsiniz.',
+            'isRead': false,
+            'timestamp': FieldValue.serverTimestamp(),
+            'type': 'lesson_approved', // Özel ikon göstermek için
+          });
+    }
   }
 
   @override
@@ -92,6 +114,12 @@ class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
               var doc = snapshot.data!.docs[index];
               var lessonData = doc.data() as Map<String, dynamic>;
 
+              // Veritabanından gelen veriler liste formatında olduğu için güvenli çekiyoruz
+              String lessonDay =
+                  (lessonData['days'] as List?)?.first ?? 'Gün belirtilmedi';
+              String lessonHour =
+                  (lessonData['hours'] as List?)?.first ?? 'Saat belirtilmedi';
+
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
@@ -123,7 +151,7 @@ class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                lessonData['athleteName'],
+                                lessonData['athleteName'] ?? 'İsimsiz Öğrenci',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -131,7 +159,7 @@ class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
                                 ),
                               ),
                               Text(
-                                "Yeni Ders Talebi",
+                                "Yeni Ders Talebi (${lessonData['lessonType'] ?? 'Online'})",
                                 style: GoogleFonts.poppins(
                                   color: ColorConstants.primaryColor,
                                   fontSize: 12,
@@ -153,7 +181,7 @@ class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
-                            "${lessonData['day']} • ${lessonData['hour']}",
+                            "$lessonDay • $lessonHour",
                             style: GoogleFonts.poppins(
                               color: Colors.white70,
                               fontSize: 13,
@@ -191,8 +219,12 @@ class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
                       children: [
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () =>
-                                _updateLessonStatus(doc.id, 'rejected'),
+                            // YENİ: lessonData parametresi de gönderiliyor
+                            onPressed: () => _updateLessonStatus(
+                              doc.id,
+                              'rejected',
+                              lessonData,
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white10,
                               shape: RoundedRectangleBorder(
@@ -208,8 +240,12 @@ class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () =>
-                                _updateLessonStatus(doc.id, 'approved'),
+                            // YENİ: lessonData parametresi de gönderiliyor
+                            onPressed: () => _updateLessonStatus(
+                              doc.id,
+                              'approved',
+                              lessonData,
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: ColorConstants.primaryColor,
                               shape: RoundedRectangleBorder(

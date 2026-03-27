@@ -1,5 +1,3 @@
-// ignore_for_file: unused_element
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -22,11 +20,258 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   void _showAddReviewModal(String coachId) {
-    // Modal kodu orijinal ile aynı, kısalttım kalabalık olmasın diye
+    int selectedStar = 5;
+    TextEditingController commentController = TextEditingController();
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E1E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[700],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    "Ders Nasıldı?",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "Eğitmeni değerlendirerek topluluğa katkı sağla.",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white54,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (index) {
+                      return IconButton(
+                        icon: Icon(
+                          index < selectedStar
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: Colors.amber,
+                          size: 40,
+                        ),
+                        onPressed: () =>
+                            setModalState(() => selectedStar = index + 1),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: commentController,
+                    maxLines: 4,
+                    style: GoogleFonts.poppins(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: "Eğitmen hakkında ne düşünüyorsun?",
+                      hintStyle: GoogleFonts.poppins(color: Colors.white30),
+                      filled: true,
+                      fillColor: Colors.black26,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              if (commentController.text.trim().isEmpty) return;
+                              setModalState(() => isSubmitting = true);
+                              await _submitReview(
+                                coachId,
+                                selectedStar,
+                                commentController.text.trim(),
+                              );
+                              if (mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      "Yorumunuz kaydedildi.",
+                                      style: GoogleFonts.poppins(),
+                                    ),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: ColorConstants.primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.black,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Text(
+                              "Yorumu Gönder",
+                              style: GoogleFonts.poppins(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _submitReview(String coachId, int rating, String comment) async {
-    // İşlem kodu orijinal ile aynı
+    final currentUser = _auth.currentUser!;
+    final myDoc = await _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .get();
+    final String myName =
+        "${myDoc.data()?['name'] ?? ''} ${myDoc.data()?['surname'] ?? ''}"
+            .trim();
+    final String? myImage = myDoc.data()?['profileImageUrl'];
+
+    await _firestore
+        .collection('users')
+        .doc(coachId)
+        .collection('reviews')
+        .doc(currentUser.uid)
+        .set({
+          'userId': currentUser.uid,
+          'userName': myName.isEmpty ? "Öğrenci" : myName,
+          'userImage': myImage,
+          'rating': rating,
+          'comment': comment,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+
+    final reviewsSnapshot = await _firestore
+        .collection('users')
+        .doc(coachId)
+        .collection('reviews')
+        .get();
+    double totalScore = 0;
+    for (var doc in reviewsSnapshot.docs) {
+      totalScore += (doc.data()['rating'] ?? 0);
+    }
+    double newAverage = totalScore / reviewsSnapshot.docs.length;
+    await _firestore.collection('users').doc(coachId).update({
+      'rating': newAverage,
+      'reviewCount': reviewsSnapshot.docs.length,
+    });
+  }
+
+  // YENİ EKLENEN İPTAL ONAY POP-UP'I
+  void _showCancelDialog(String docId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          "Emin misin?",
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          "Bu dersi iptal etmek istediğine emin misin? Bu işlem geri alınamaz.",
+          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              "Vazgeç",
+              style: GoogleFonts.poppins(
+                color: Colors.white54,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx); // Pop-up'ı kapat
+              await _firestore.collection('lessons').doc(docId).update({
+                'status': 'cancelled',
+              });
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      "Ders başarıyla iptal edildi.",
+                      style: GoogleFonts.poppins(),
+                    ),
+                    backgroundColor: Colors.redAccent,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              "Dersi İptal Et",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -109,16 +354,16 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true, // PANELİM İLE AYNI YAPI
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          backgroundColor: Colors.black.withOpacity(0.6), // ŞEFFAF SİYAH
+          backgroundColor: Colors.black.withOpacity(0.6),
           elevation: 0,
-          automaticallyImplyLeading: false, // GERİ TUŞU KALDIRILDI
+          automaticallyImplyLeading: false,
           title: Text(
             "Derslerim",
             style: GoogleFonts.poppins(
               color: Colors.white,
-              fontSize: 24, // Uyumlu başlık boyutu
+              fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -140,7 +385,6 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
               return _buildEmptyState(context);
 
             return ListView.builder(
-              // APPBAR ALTINDA EZİLMEMESİ İÇİN DİNAMİK BOŞLUK
               padding: EdgeInsets.only(
                 top: MediaQuery.of(context).padding.top + kToolbarHeight + 16,
                 left: 16,
@@ -149,6 +393,8 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
               ),
               itemCount: snapshot.data!.docs.length,
               itemBuilder: (context, index) {
+                // Doküman ID'sini alıyoruz (İptal işlemi için gerekli)
+                String docId = snapshot.data!.docs[index].id;
                 var lesson =
                     snapshot.data!.docs[index].data() as Map<String, dynamic>;
                 String status = lesson['status'] ?? 'pending';
@@ -157,6 +403,8 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                 Color statusColor = Colors.orange;
                 String statusText = "Onay Bekliyor";
                 IconData statusIcon = Icons.hourglass_empty_rounded;
+
+                // Durum (Status) Mantığı
                 if (status == 'approved') {
                   statusColor = Colors.green;
                   statusText = "Aktif Ders";
@@ -165,6 +413,10 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                   statusColor = Colors.redAccent;
                   statusText = "Reddedildi";
                   statusIcon = Icons.cancel_rounded;
+                } else if (status == 'cancelled') {
+                  statusColor = Colors.grey;
+                  statusText = "İptal Edildi";
+                  statusIcon = Icons.block_rounded;
                 }
 
                 return Container(
@@ -376,6 +628,43 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                                 ),
                               ),
                             ],
+                          ),
+                        ),
+                      ],
+
+                      // --- YENİ EKLENEN İPTAL ET BUTONU ---
+                      if (status == 'pending' || status == 'approved') ...[
+                        const SizedBox(height: 12),
+                        ScaleButton(
+                          onPressed: () => _showCancelDialog(docId),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.redAccent.withOpacity(0.5),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.cancel_outlined,
+                                  color: Colors.redAccent,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Dersi İptal Et",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.redAccent,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
