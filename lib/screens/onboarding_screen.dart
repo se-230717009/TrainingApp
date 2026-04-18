@@ -709,14 +709,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.black : Colors.white,
+                      color: Colors.black,
                     ),
                   ),
                   Text(
                     subtext,
                     style: GoogleFonts.poppins(
                       fontSize: 12,
-                      color: isSelected ? Colors.black87 : Colors.white54,
+                      color: Colors.black87,
                     ),
                   ),
                 ],
@@ -747,16 +747,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.black : Colors.white,
-                size: 28,
-              ),
+              Icon(icon, color: Colors.black, size: 28),
               const SizedBox(height: 8),
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  color: isSelected ? Colors.black : Colors.white,
+                  color: Colors.black,
                   fontWeight: FontWeight.w600,
                 ),
               ),

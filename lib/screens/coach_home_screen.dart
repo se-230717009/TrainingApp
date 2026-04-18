@@ -355,7 +355,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                 const Divider(color: Colors.white10),
                 const SizedBox(height: 16),
                 Text(
-                  "Aktif Dersin",
+                  "Profilin",
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontSize: 15,

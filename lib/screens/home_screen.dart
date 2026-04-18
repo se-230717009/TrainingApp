@@ -1,4 +1,4 @@
-// ignore_for_file: unused_field, unused_element
+// ignore_for_file: unused_field, unused_element, deprecated_member_use, prefer_final_fields
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -98,8 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
     }
     if (coach['coachCharacter'] == idealCoachCharacter) score += 20;
-    if (_preferredGender != "Farketmez" && coach['gender'] == _preferredGender)
+    if (_preferredGender != "Farketmez" &&
+        coach['gender'] == _preferredGender) {
       score += 10;
+    }
 
     Map<String, dynamic>? dayHoursMap = coach['dayHoursMap'];
     if (dayHoursMap != null) {
@@ -420,21 +422,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     .where('isApproved', isEqualTo: true)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting)
+                  if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
                       child: CircularProgressIndicator(
                         color: ColorConstants.primaryColor,
                       ),
                     );
-                  if (snapshot.hasError)
+                  }
+                  if (snapshot.hasError) {
                     return Center(
                       child: Text(
                         "Hata oluştu. Firebase kurallarını kontrol edin.",
                         style: GoogleFonts.poppins(color: Colors.white54),
                       ),
                     );
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                  }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                     return const SizedBox();
+                  }
 
                   final filteredDocs = snapshot.data!.docs.where((doc) {
                     final coach = doc.data() as Map<String, dynamic>;
@@ -468,13 +473,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     return matchesSearch && matchesMode;
                   }).toList();
 
-                  if (filteredDocs.isEmpty)
+                  if (filteredDocs.isEmpty) {
                     return Center(
                       child: Text(
                         "Kriterlerine uygun eğitmen bulunamadı.",
                         style: GoogleFonts.poppins(color: Colors.white54),
                       ),
                     );
+                  }
 
                   List<Map<String, dynamic>> perfectMatches = [];
                   List<Map<String, dynamic>> alternativeMatches = [];
@@ -486,19 +492,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       alternativeMatches.add(coach);
                     } else {
                       final lessonSport = coach['lessonSport'] ?? '';
-                      if (_interestedSports.contains(lessonSport))
+                      if (_interestedSports.contains(lessonSport)) {
                         perfectMatches.add(coach);
-                      else
+                      } else {
                         alternativeMatches.add(coach);
+                      }
                     }
                   }
 
-                  if (!_isGuest && !_sortByCheapest)
+                  if (!_isGuest && !_sortByCheapest) {
                     perfectMatches.sort(
                       (a, b) => _calculateMatchScore(
                         b,
                       ).compareTo(_calculateMatchScore(a)),
                     );
+                  }
 
                   return ListView(
                     padding: const EdgeInsets.symmetric(vertical: 8),

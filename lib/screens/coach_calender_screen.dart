@@ -909,7 +909,7 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                             selectedColor: ColorConstants.primaryColor,
                             backgroundColor: Colors.white10,
                             labelStyle: GoogleFonts.poppins(
-                              color: isSelected ? Colors.black : Colors.white,
+                              color: Colors.black,
                               fontWeight: isSelected
                                   ? FontWeight.bold
                                   : FontWeight.normal,

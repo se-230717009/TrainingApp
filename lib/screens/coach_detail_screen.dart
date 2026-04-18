@@ -155,19 +155,21 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         .orderBy('timestamp', descending: true)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting)
+                      if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
                           child: CircularProgressIndicator(
                             color: ColorConstants.primaryColor,
                           ),
                         );
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+                      }
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                         return Center(
                           child: Text(
                             "Henüz yorum yapılmamış.",
                             style: GoogleFonts.poppins(color: Colors.white54),
                           ),
                         );
+                      }
                       return ListView.builder(
                         controller: scrollController,
                         padding: const EdgeInsets.symmetric(
@@ -438,7 +440,7 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                 showGuestRegistrationPopup(context);
                                 return;
                               }
-                              if (coachUid.isNotEmpty)
+                              if (coachUid.isNotEmpty) {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -448,6 +450,7 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                     ),
                                   ),
                                 );
+                              }
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 14),
@@ -916,8 +919,9 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
     super.initState();
     _coachUid = widget.coachData['uid'] ?? '';
     _availableDays = widget.coachData['availableDays'] ?? [];
-    if (widget.coachData['deliveryMode'] == 'Yüzyüze')
+    if (widget.coachData['deliveryMode'] == 'Yüzyüze') {
       _selectedLessonType = 'Yüzyüze';
+    }
 
     // VARSAYILAN BRANŞI AYARLA
     List<dynamic> specs = widget.coachData['specialties'] ?? [];
@@ -938,26 +942,29 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
         .where('status', isEqualTo: 'approved')
         .snapshots()
         .listen((snap) {
-          if (mounted)
+          if (mounted) {
             setState(() => _lessons = snap.docs.map((d) => d.data()).toList());
+          }
         });
     _activitiesSub = db
         .collection('coach_manual_activities')
         .where('coachId', isEqualTo: _coachUid)
         .snapshots()
         .listen((snap) {
-          if (mounted)
+          if (mounted) {
             setState(
               () => _activities = snap.docs.map((d) => d.data()).toList(),
             );
+          }
         });
     _routinesSub = db
         .collection('coach_routines')
         .where('coachId', isEqualTo: _coachUid)
         .snapshots()
         .listen((snap) {
-          if (mounted)
+          if (mounted) {
             setState(() => _routines = snap.docs.map((d) => d.data()).toList());
+          }
         });
   }
 
@@ -999,11 +1006,15 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
         int start = int.tryParse(parts[0].split(':')[0].trim()) ?? 0;
         int end = int.tryParse(parts[1].split(':')[0].trim()) ?? 0;
         if (end == 0) end = 24;
-        for (int i = start; i <= end; i++) hours.add(i);
+        for (int i = start; i <= end; i++) {
+          hours.add(i);
+        }
       }
     }
     if (hours.isEmpty) {
-      for (int i = 8; i <= 22; i++) hours.add(i);
+      for (int i = 8; i <= 22; i++) {
+        hours.add(i);
+      }
     }
     List<int> sorted = hours.toList()..sort();
     return sorted.map((h) => "${h.toString().padLeft(2, '0')}:00").toList();
@@ -1600,18 +1611,17 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                                     selectedColor: ColorConstants.primaryColor,
                                     backgroundColor: Colors.white10,
                                     labelStyle: GoogleFonts.poppins(
-                                      color: isSelected
-                                          ? Colors.black
-                                          : Colors.white,
+                                      color: Colors.black,
                                       fontWeight: isSelected
                                           ? FontWeight.bold
                                           : FontWeight.normal,
                                     ),
                                     onSelected: (val) {
-                                      if (val)
+                                      if (val) {
                                         setState(
                                           () => _selectedSport = s.toString(),
                                         );
+                                      }
                                     },
                                   );
                                 }).toList()
@@ -1783,16 +1793,15 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                                 selectedColor: ColorConstants.primaryColor,
                                 backgroundColor: Colors.white10,
                                 labelStyle: GoogleFonts.poppins(
-                                  color: isSelected
-                                      ? Colors.black
-                                      : Colors.white,
+                                  color: Colors.black,
                                   fontWeight: isSelected
                                       ? FontWeight.bold
                                       : FontWeight.normal,
                                 ),
                                 onSelected: (val) {
-                                  if (val)
+                                  if (val) {
                                     setState(() => _selectedLessonType = type);
+                                  }
                                 },
                               ),
                             );
@@ -1810,11 +1819,12 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                                     showGuestRegistrationPopup(context);
                                     return;
                                   }
-                                  if (!_isSubmitting)
+                                  if (!_isSubmitting) {
                                     _submitLessonRequest(
                                       false,
                                       specificType: 'Özel Ders',
                                     );
+                                  }
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
@@ -1868,8 +1878,9 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                                     showGuestRegistrationPopup(context);
                                     return;
                                   }
-                                  if (!_isSubmitting)
+                                  if (!_isSubmitting) {
                                     _submitLessonRequest(true);
+                                  }
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(

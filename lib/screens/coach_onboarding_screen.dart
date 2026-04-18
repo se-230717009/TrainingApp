@@ -901,7 +901,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.black : Colors.white,
+                        color: Colors.black,
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
