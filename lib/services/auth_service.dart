@@ -1,18 +1,60 @@
+/// lib/services/auth_service.dart
+///
+/// Concrete implementation of [IAuthService] backed by Firebase Auth and
+/// Cloud Firestore.
+///
+/// **Responsibilities (Single Responsibility Principle):**
+///   - Firebase Auth sign-in / registration / sign-out.
+///   - Writing the initial user document to Firestore on first sign-up.
+///   - Reading the user's role and onboarding state from Firestore.
+///
+/// Screens must depend on the [IAuthService] abstraction, not this class
+/// directly, to honour the Dependency Inversion Principle.
+
+library;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'interfaces/i_auth_service.dart';
 
-class AuthService {
-  // Firebase'in yetkili servislerine erişim
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+/// Firebase-backed implementation of [IAuthService].
+class AuthService implements IAuthService {
+  // ---------------------------------------------------------------------------
+  // Dependencies
+  // ---------------------------------------------------------------------------
 
-  // 1. DEĞİŞİKLİK: Artık 'GoogleSignIn.instance' kullanmak zorundayız (v7 kuralı)
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  /// Firebase Auth instance — entry point for all auth operations.
+  final FirebaseAuth _auth;
 
+  /// Firestore instance — used to persist and read user profile documents.
+  final FirebaseFirestore _firestore;
+
+  /// Google Sign-In helper — must be initialised before the first call.
+  final GoogleSignIn _googleSignIn;
+
+  /// Guards against calling `_googleSignIn.initialize()` more than once per
+  /// app session.
   bool _isGoogleInitialized = false;
 
-  // 2. DEĞİŞİKLİK: Google servisini kullanmadan önce uyandırmamız (initialize) gerekiyor
+  /// Creates an [AuthService].
+  ///
+  /// All three dependencies are optional and fall back to their Firebase
+  /// singletons, making the class easy to unit-test with fakes.
+  AuthService({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+    GoogleSignIn? googleSignIn,
+  })  : _auth = auth ?? FirebaseAuth.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance,
+        _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /// Ensures the Google Sign-In SDK is ready before the first authentication
+  /// attempt. Calling `initialize()` more than once causes an error, so we
+  /// guard it with [_isGoogleInitialized].
   Future<void> _ensureGoogleInitialized() async {
     if (!_isGoogleInitialized) {
       await _googleSignIn.initialize();
@@ -20,180 +62,195 @@ class AuthService {
     }
   }
 
-  // --- GOOGLE İLE GİRİŞ / KAYIT ---
+  /// Writes a new user document to Firestore using the provided fields.
+  ///
+  /// Called both from [registerUser] (email+password flow) and from
+  /// [signInWithGoogle] when a brand-new Google account is being registered.
+  Future<void> _createUserDocument({
+    required String uid,
+    required String email,
+    required String name,
+    required String surname,
+    required String username,
+    required String userType,
+  }) async {
+    await _firestore.collection('users').doc(uid).set({
+      'uid': uid,
+      'email': email,
+      'name': name,
+      'surname': surname,
+      'username': username,
+      'userType': userType,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isVerified': false,
+      'isOnboardingCompleted': false,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // IAuthService — Authentication
+  // ---------------------------------------------------------------------------
+
+  @override
   Future<String?> signInWithGoogle({String? role}) async {
     try {
-      // Önce servisi uyandırıyoruz
       await _ensureGoogleInitialized();
 
-      // 3. DEĞİŞİKLİK: signIn() yerine authenticate() kullanıyoruz
+      // Trigger the Google authentication flow.
       final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
+      final GoogleSignInAuthentication googleAuth =
+          googleUser.authentication;
 
-      // Kimlik Doğrulama Bilgilerini Al
-      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
-
-      // 4. DEĞİŞİKLİK: Yeni sürümde accessToken ayrı bir yere taşındı,
-      // Firebase'e giriş yapmak için sadece idToken vermemiz yeterli.
+      // Build a Firebase credential from the Google ID token.
       final AuthCredential credential = GoogleAuthProvider.credential(
         idToken: googleAuth.idToken,
       );
 
-      // Firebase'e Giriş Yap
-      UserCredential userCredential = await _auth.signInWithCredential(
-        credential,
-      );
-      String uid = userCredential.user!.uid;
+      final UserCredential userCredential =
+          await _auth.signInWithCredential(credential);
+      final String uid = userCredential.user!.uid;
 
-      // Kullanıcı Veritabanında Var Mı Kontrol Et
-      DocumentSnapshot doc = await _firestore
-          .collection('users')
-          .doc(uid)
-          .get();
+      // Check whether this account already exists in Firestore.
+      final DocumentSnapshot doc =
+          await _firestore.collection('users').doc(uid).get();
 
       if (!doc.exists) {
-        // --- YENİ KULLANICI DURUMU ---
+        // --- New user ---
         if (role != null) {
-          // Eğer Register ekranından geldiyse veritabanına kaydet
-          await _firestore.collection('users').doc(uid).set({
-            'uid': uid,
-            'email': googleUser.email,
-            'name': googleUser.displayName?.split(' ').first ?? '',
-            'surname':
-                googleUser.displayName?.split(' ').skip(1).join(' ') ?? '',
-            'username': googleUser.email.split('@').first,
-            'userType': role,
-            'createdAt': FieldValue.serverTimestamp(),
-            'isVerified': false,
-            'isOnboardingCompleted': false,
-          });
-          return null; // Kayıt başarılı
+          // Called from the registration screen: create the profile.
+          final nameParts = (googleUser.displayName ?? '').split(' ');
+          await _createUserDocument(
+            uid: uid,
+            email: googleUser.email,
+            name: nameParts.first,
+            surname: nameParts.skip(1).join(' '),
+            username: googleUser.email.split('@').first,
+            userType: role,
+          );
+          return null; // Registration successful.
         } else {
-          // Eğer Login ekranından geldiyse ve hesabı yoksa, auth'u silip uyarı ver
+          // Called from the login screen but no account exists — reject.
           await userCredential.user!.delete();
-          await _googleSignIn.signOut(); // Google'dan da çıkış yap
-          return "Kayıtlı hesabınız yok. Lütfen 'Hesap Oluştur' adımından rolünüzü seçerek kayıt olun.";
+          await _googleSignIn.signOut();
+          return "Kayıtlı hesabınız yok. Lütfen 'Hesap Oluştur' adımından "
+              "rolünüzü seçerek kayıt olun.";
         }
-      } else {
-        // --- ESKİ KULLANICI DURUMU ---
-        return null; // Zaten hesabı var, giriş başarılı
       }
+
+      // --- Existing user — sign-in successful ---
+      return null;
     } catch (e) {
       return "Google ile işlem başarısız: $e";
     }
   }
 
-  // --- KAYIT OL (REGISTER) ---
+  @override
   Future<String?> registerUser({
     required String email,
     required String password,
     required String name,
     required String surname,
     required String username,
-    required String userType, // 'athlete' veya 'coach'
+    required String userType,
   }) async {
     try {
-      // 1. Firebase Auth'ta kullanıcı oluştur (E-posta ve Şifre ile)
-      UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(email: email, password: password);
+      // 1. Create the Firebase Auth account.
+      final UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-      // 2. Oluşan kullanıcının ID'sini (UID) al
-      String uid = userCredential.user!.uid;
+      // 2. Persist the full profile to Firestore.
+      await _createUserDocument(
+        uid: userCredential.user!.uid,
+        email: email,
+        name: name,
+        surname: surname,
+        username: username,
+        userType: userType,
+      );
 
-      // 3. Firestore veritabanına kullanıcının detaylarını kaydet
-      await _firestore.collection('users').doc(uid).set({
-        'uid': uid,
-        'email': email,
-        'name': name,
-        'surname': surname,
-        'username': username,
-        'userType': userType, // Rolü burada kaydediyoruz
-        'createdAt': FieldValue.serverTimestamp(), // Kayıt tarihi
-        'isVerified': false, // Henüz onaylı değil (Antrenörler için önemli)
-        'isOnboardingCompleted':
-            false, // EKLENDİ: Klasik kayıtta da onboarding false olmalı
-      });
-
-      return null; // Hata yok, işlem başarılı
+      return null; // Registration successful.
     } on FirebaseAuthException catch (e) {
-      // Firebase'den özel bir hata gelirse (Örn: E-posta zaten kayıtlı)
+      // Surface Firebase-specific error messages (e.g. email already in use).
       return e.message;
     } catch (e) {
-      // Beklenmedik bir hata olursa
       return "Bir hata oluştu: $e";
     }
   }
 
-  // --- GİRİŞ YAP (LOGIN) ---
+  @override
   Future<String?> signIn({
     required String email,
     required String password,
   }) async {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-      return null; // Hata yok, giriş başarılı
+      return null; // Sign-in successful.
     } on FirebaseAuthException catch (e) {
-      return e.message; // Hata mesajını döndür
+      return e.message;
     } catch (e) {
       return "Bir hata oluştu: $e";
     }
   }
 
-  // --- ONBOARDING TAMAMLANDI MI KONTROL ET ---
+  // ---------------------------------------------------------------------------
+  // IAuthService — User data
+  // ---------------------------------------------------------------------------
+
+  @override
   Future<bool> checkOnboardingStatus(String uid) async {
     try {
-      DocumentSnapshot doc = await _firestore
-          .collection('users')
-          .doc(uid)
-          .get();
+      final DocumentSnapshot doc =
+          await _firestore.collection('users').doc(uid).get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
-        // 'isOnboardingCompleted' true mu diye bakıyoruz
         return data['isOnboardingCompleted'] == true;
       }
-      return false; // Kullanıcı yoksa veya alan yoksa false
-    } catch (e) {
+      return false;
+    } catch (_) {
       return false;
     }
   }
 
-  // --- ÇIKIŞ YAP (LOGOUT) ---
-  Future<void> signOut() async {
-    await _auth.signOut();
-    try {
-      await _googleSignIn
-          .signOut(); // Temiz bir çıkış için Google oturumunu da sonlandıralım
-    } catch (e) {
-      // Hata verirse yoksayabiliriz
-    }
-  }
-
-  // --- KULLANICI ROLÜNÜ GETİR (COACH / ATHLETE) ---
+  @override
   Future<String?> getUserType(String uid) async {
     try {
-      DocumentSnapshot doc = await _firestore
-          .collection('users')
-          .doc(uid)
-          .get();
+      final DocumentSnapshot doc =
+          await _firestore.collection('users').doc(uid).get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
         return data['userType'] as String?;
       }
       return null;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }
 
-  // --- KULLANICI PROFİLİNİ GÜNCELLE (ONBOARDING İÇİN) ---
+  @override
   Future<void> updateUserProfile({
     required String uid,
     required Map<String, dynamic> data,
   }) async {
+    // Re-throws so callers can show appropriate error UI.
+    await _firestore.collection('users').doc(uid).update(data);
+  }
+
+  // ---------------------------------------------------------------------------
+  // IAuthService — Sign out
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<void> signOut() async {
+    await _auth.signOut();
     try {
-      await _firestore.collection('users').doc(uid).update(data);
-    } catch (e) {
-      print("Profil güncelleme hatası: $e");
-      rethrow; // Hatayı yukarı fırlat
+      // Signing out of Google is a best-effort operation.
+      // If it fails (e.g. Google was never used in this session), we ignore it.
+      await _googleSignIn.signOut();
+    } catch (_) {
+      // Intentionally swallowed.
     }
   }
 }

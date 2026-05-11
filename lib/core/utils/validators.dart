@@ -1,7 +1,19 @@
-// lib/core/utils/validators.dart
+/// lib/core/utils/validators.dart
+///
+/// Pure, stateless form validation functions used by [CustomTextField].
+/// Each function accepts a nullable [String] and returns `null` when valid
+/// or a localised error string when validation fails.
+///
+/// All validators follow the same signature required by [TextFormField.validator].
 
+/// Collection of reusable form field validators.
 class Validators {
-  // E-posta kontrolü
+  // Private constructor — this class should never be instantiated.
+  Validators._();
+
+  /// Validates an email address using a basic RFC-compatible regex.
+  ///
+  /// Returns `null` when valid; an error string otherwise.
   static String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'E-posta adresi gerekli';
@@ -14,7 +26,13 @@ class Validators {
     return null;
   }
 
-  // Güçlü şifre kontrolü
+  /// Validates a password against the app's strength policy:
+  ///   - Minimum 8 characters.
+  ///   - At least one uppercase letter.
+  ///   - At least one digit.
+  ///   - At least one special character.
+  ///
+  /// Returns `null` when valid; an error string otherwise.
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Şifre gerekli';
@@ -34,7 +52,11 @@ class Validators {
     return null;
   }
 
-  // Kullanıcı adı kontrolü
+  /// Validates a username:
+  ///   - 3–20 characters.
+  ///   - Only letters, digits, and underscores (`_`).
+  ///
+  /// Returns `null` when valid; an error string otherwise.
   static String? validateUsername(String? value) {
     if (value == null || value.isEmpty) {
       return 'Kullanıcı adı gerekli';
@@ -52,7 +74,9 @@ class Validators {
     return null;
   }
 
-  // --- YENİ: YAŞ KONTROLÜ (12-100 Arası) ---
+  /// Validates a user's age (must be between 12 and 100 inclusive).
+  ///
+  /// Returns `null` when valid; an error string otherwise.
   static String? validateAge(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Yaş bilgisi gerekli';
@@ -67,7 +91,9 @@ class Validators {
     return null;
   }
 
-  // --- YENİ: BOY KONTROLÜ (100-250 cm Arası) ---
+  /// Validates height in centimetres (must be between 100 and 250 inclusive).
+  ///
+  /// Returns `null` when valid; an error string otherwise.
   static String? validateHeight(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Boy bilgisi gerekli';
@@ -82,7 +108,9 @@ class Validators {
     return null;
   }
 
-  // --- YENİ: KİLO KONTROLÜ (30-300 kg Arası) ---
+  /// Validates weight in kilograms (must be between 30 and 300 inclusive).
+  ///
+  /// Returns `null` when valid; an error string otherwise.
   static String? validateWeight(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Kilo bilgisi gerekli';

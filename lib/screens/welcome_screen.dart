@@ -1,3 +1,10 @@
+/// lib/screens/welcome_screen.dart
+///
+/// The first screen shown to unauthenticated users who open the app.
+/// Displays a hero background image with two action buttons:
+///   - "Log In"  → navigates to [LoginScreen].
+///   - "Create Account" → navigates to [RoleSelectionScreen].
+library;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/color_constants.dart';
@@ -5,6 +12,7 @@ import '../widgets/custom_button.dart';
 import 'role_selection_screen.dart';
 import 'login_screen.dart';
 
+/// Landing / splash screen for unauthenticated users.
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 

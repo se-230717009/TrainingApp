@@ -16,6 +16,10 @@ void main() async {
   runApp(const MyApp());
 }
 
+/// Root widget of the application.
+///
+/// Configures [MaterialApp] with the app theme and sets [AuthWrapper] as the
+/// home widget, which decides which screen to show based on auth state.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -26,11 +30,10 @@ class MyApp extends StatelessWidget {
       title: 'CoachApp',
       theme: ThemeData(
         primaryColor: ColorConstants.primaryColor,
-        // Scaffold rengini siyah yaptık, dark mode premium havası bozulmasın
+        // Keep the scaffold background black for the premium dark-mode look.
         scaffoldBackgroundColor: Colors.black,
         useMaterial3: true,
       ),
-      // Yine Splash Screen ile başlıyoruz
       home: const AuthWrapper(),
     );
   }

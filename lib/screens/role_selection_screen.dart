@@ -1,9 +1,19 @@
+/// lib/screens/role_selection_screen.dart
+///
+/// Asks the user to choose their role before creating an account.
+/// Tapping a role card navigates to [UserRegisterScreen] with the
+/// selected [userType] (`'coach'` or `'athlete'`).
+library;
 import 'package:coachingapp/screens/user_register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/scale_button.dart';
 
+/// Role-selection screen shown during the registration flow.
+///
+/// Presents two animated cards — Coach and Athlete — so the user can
+/// indicate their role before the registration form is shown.
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
 

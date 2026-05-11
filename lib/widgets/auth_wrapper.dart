@@ -1,3 +1,19 @@
+/// lib/widgets/auth_wrapper.dart
+///
+/// Root widget that listens to Firebase Auth state changes and routes the
+/// user to the correct screen on app start.
+///
+/// Decision tree:
+///   1. Auth state loading  → show a loading spinner.
+///   2. No authenticated user → show [HomeScreen] (guest mode).
+///   3. Authenticated user:
+///        a. Fetch Firestore profile.
+///        b. Profile missing → [OnboardingScreen] (new user).
+///        c. Onboarding complete + coach  → [CoachHomeScreen].
+///        d. Onboarding complete + athlete → [HomeScreen].
+///        e. Onboarding incomplete + coach  → [CoachOnboardingScreen].
+///        f. Onboarding incomplete + athlete → [OnboardingScreen].
+library;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +23,8 @@ import '../screens/coach_home_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/coach_onboarding_screen.dart';
 
+/// Listens to [FirebaseAuth.authStateChanges] and renders the appropriate
+/// screen based on the user's authentication status and profile state.
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 

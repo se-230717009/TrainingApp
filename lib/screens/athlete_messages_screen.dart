@@ -1,3 +1,9 @@
+/// lib/screens/athlete_messages_screen.dart
+///
+/// Displays the athlete's conversation list by listening to the
+/// `chat_rooms` collection filtered to rooms where the current user
+/// is a participant. Tapping a room opens [ChatScreen].
+library;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,6 +12,7 @@ import '../core/constants/color_constants.dart';
 import '../widgets/gradient_background.dart';
 import 'chat_screen.dart';
 
+/// Athlete's messages inbox — shows all active chat rooms.
 class AthleteMessagesScreen extends StatefulWidget {
   const AthleteMessagesScreen({super.key});
 

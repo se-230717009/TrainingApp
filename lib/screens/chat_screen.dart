@@ -1,3 +1,11 @@
+/// lib/screens/chat_screen.dart
+///
+/// One-on-one real-time chat screen between an athlete and a coach.
+///
+/// Messages are sent and received via [ChatService], which manages the
+/// `chat_rooms` Firestore collection. The screen listens to a real-time
+/// stream so new messages appear without any manual refresh.
+library;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -6,8 +14,15 @@ import '../core/constants/color_constants.dart';
 import '../services/chat_service.dart';
 import '../widgets/gradient_background.dart';
 
+/// Real-time one-on-one chat screen.
+///
+/// [receiverId] and [receiverName] are provided by the messages list screen
+/// when the user taps a conversation.
 class ChatScreen extends StatefulWidget {
+  /// Firebase Auth UID of the other participant.
   final String receiverId;
+
+  /// Display name of the other participant (shown in the app bar).
   final String receiverName;
 
   const ChatScreen({

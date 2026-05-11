@@ -1,17 +1,40 @@
+/// lib/widgets/custom_textfield.dart
+///
+/// A styled input field used consistently across all form screens.
+/// Wraps [TextFormField] so it participates in [Form] validation.
+library;
 // lib/widgets/custom_textfield.dart GÜNCEL HALİ
 
 import 'package:flutter/material.dart';
 import '../core/constants/color_constants.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// A styled text input field backed by [TextFormField].
+///
+/// Uses [ColorConstants.inputFill] as the background and [GoogleFonts.poppins]
+/// for consistent typography. Supports optional password masking, keyboard
+/// type hints, character limits, and [Form] validation.
 class CustomTextField extends StatelessWidget {
+  /// Hint text shown inside the empty field.
   final String label;
+
+  /// Leading icon rendered as a prefix inside the field.
   final IconData icon;
+
+  /// When `true`, input is obscured (password mode). Defaults to `false`.
   final bool isPassword;
+
+  /// Optional controller for reading or pre-filling the field value.
   final TextEditingController? controller;
+
+  /// Optional character limit; hides the default Flutter counter text.
   final int? maxLength;
+
+  /// Keyboard type hint (e.g. [TextInputType.emailAddress]).
   final TextInputType? keyboardType;
-  final String? Function(String?)? validator; // YENİ: Validator eklendi
+
+  /// Optional [Form] validator function that returns an error string or `null`.
+  final String? Function(String?)? validator;
 
   const CustomTextField({
     super.key,

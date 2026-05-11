@@ -1,59 +1,95 @@
+/// lib/services/chat_service.dart
+///
+/// Concrete implementation of [IChatService] backed by Cloud Firestore.
+///
+/// **Responsibilities:**
+///   - Generating deterministic chat-room IDs so two users always share
+///     the same room regardless of who initiates the conversation.
+///   - Sending messages and updating the room preview document atomically.
+///   - Streaming messages in chronological order.
+
+library;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'interfaces/i_chat_service.dart';
 
-class ChatService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+/// Firebase-backed implementation of [IChatService].
+class ChatService implements IChatService {
+  // ---------------------------------------------------------------------------
+  // Dependencies
+  // ---------------------------------------------------------------------------
 
-  // 1. Eşsiz Sohbet Odası ID'si Üretme (Örn: ali_veli ile veli_ali aynı odayı açmalı)
+  /// Firestore instance — injectable so tests can pass a fake.
+  final FirebaseFirestore _firestore;
+
+  /// Firebase Auth instance — used to identify the current sender.
+  final FirebaseAuth _auth;
+
+  /// Creates a [ChatService].
+  ChatService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /// Generates a deterministic chat-room ID for any two users.
+  ///
+  /// Sorting the UIDs alphabetically before joining ensures that
+  /// `_getChatRoomId(A, B)` == `_getChatRoomId(B, A)`, so both participants
+  /// always land in the same Firestore document regardless of who opens the
+  /// conversation first.
   String _getChatRoomId(String userId, String otherUserId) {
-    List<String> ids = [userId, otherUserId];
-    ids.sort(); // Alfabetik sırala ki kim kime atarsa atsın aynı ID çıksın
-    return ids.join("_");
+    final ids = [userId, otherUserId]..sort();
+    return ids.join('_');
   }
 
-  // 2. Mesaj Gönderme
+  // ---------------------------------------------------------------------------
+  // IChatService
+  // ---------------------------------------------------------------------------
+
+  @override
   Future<void> sendMessage(String receiverId, String message) async {
-    final String currentUserId = _auth.currentUser!.uid;
+    final String senderId = _auth.currentUser!.uid;
     final Timestamp timestamp = Timestamp.now();
+    final String chatRoomId = _getChatRoomId(senderId, receiverId);
 
-    // Mesaj Paketi
-    Map<String, dynamic> newMessage = {
-      'senderId': currentUserId,
-      'receiverId': receiverId,
-      'message': message,
-      'timestamp': timestamp,
-    };
-
-    // İki kullanıcının ortak oda ID'sini bul
-    String chatRoomId = _getChatRoomId(currentUserId, receiverId);
-
+    // 1. Update (or create) the room document with the latest message preview.
+    //    Using `merge: true` so existing room metadata is preserved.
     await _firestore.collection('chat_rooms').doc(chatRoomId).set(
       {
-        'participants': [currentUserId, receiverId],
+        'participants': [senderId, receiverId],
         'lastMessage': message,
         'timestamp': timestamp,
       },
       SetOptions(merge: true),
-    ); // merge: true sayesinde var olan veriyi silmez, üstüne yazar
+    );
 
-    // Firestore'a kaydet (chat_rooms -> ODA_ID -> messages -> MESAJ_ID)
+    // 2. Add the full message to the room's messages subcollection.
     await _firestore
         .collection('chat_rooms')
         .doc(chatRoomId)
         .collection('messages')
-        .add(newMessage);
+        .add({
+      'senderId': senderId,
+      'receiverId': receiverId,
+      'message': message,
+      'timestamp': timestamp,
+    });
   }
 
-  // 3. Mesajları Çekme (Stream ile anlık dinleme)
+  @override
   Stream<QuerySnapshot> getMessages(String userId, String otherUserId) {
-    String chatRoomId = _getChatRoomId(userId, otherUserId);
-
+    final String chatRoomId = _getChatRoomId(userId, otherUserId);
+    // Order oldest-first so new messages appear at the bottom of the list.
     return _firestore
         .collection('chat_rooms')
         .doc(chatRoomId)
         .collection('messages')
-        .orderBy('timestamp', descending: false) // Eskiden yeniye sırala
+        .orderBy('timestamp', descending: false)
         .snapshots();
   }
 }

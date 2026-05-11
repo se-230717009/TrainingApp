@@ -1,9 +1,28 @@
+/// lib/widgets/scale_button.dart
+///
+/// A gesture-driven button that applies a subtle scale-down animation
+/// on press, giving tactile feedback without any platform-specific chrome.
+///
+/// Used as a wrapper throughout the app wherever a custom-painted widget
+/// needs to respond to taps (e.g. [CoachCard], back-arrow buttons, etc.).
+library;
 import 'package:flutter/material.dart';
 
+/// Wraps any [child] widget with a press-down scale animation.
+///
+/// When the user presses the widget it shrinks to [scaleAmount] × its normal
+/// size, then springs back on release. The [onPressed] callback fires on
+/// a completed tap-up gesture.
 class ScaleButton extends StatefulWidget {
+  /// The widget to display inside the animated container.
   final Widget child;
+
+  /// Callback invoked when the user completes a tap gesture.
   final VoidCallback onPressed;
-  final double scaleAmount; // Ne kadar küçülecek? (Varsayılan 0.95)
+
+  /// The scale factor applied while the button is pressed.
+  /// Defaults to `0.95` (a 5 % shrink).
+  final double scaleAmount;
 
   const ScaleButton({
     super.key,
@@ -24,9 +43,10 @@ class _ScaleButtonState extends State<ScaleButton>
   @override
   void initState() {
     super.initState();
+    // Short duration so the button feels snappy.
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 100), // Çok hızlı tepki versin
+      duration: const Duration(milliseconds: 100),
       lowerBound: 0.0,
       upperBound: 1.0,
     );
@@ -34,7 +54,9 @@ class _ScaleButtonState extends State<ScaleButton>
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: widget.scaleAmount,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -43,18 +65,17 @@ class _ScaleButtonState extends State<ScaleButton>
     super.dispose();
   }
 
-  void _onTapDown(TapDownDetails details) {
-    _controller.forward(); // Basınca küçült
-  }
+  /// Shrinks the widget when the user presses down.
+  void _onTapDown(TapDownDetails details) => _controller.forward();
 
+  /// Restores the widget size and fires [onPressed] when the tap is completed.
   void _onTapUp(TapUpDetails details) {
-    _controller.reverse(); // Bırakınca büyüt
-    widget.onPressed(); // İşlemi yap
+    _controller.reverse();
+    widget.onPressed();
   }
 
-  void _onTapCancel() {
-    _controller.reverse(); // Vazgeçerse büyüt
-  }
+  /// Restores the widget size if the tap is cancelled (e.g. the user drags away).
+  void _onTapCancel() => _controller.reverse();
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +87,7 @@ class _ScaleButtonState extends State<ScaleButton>
         animation: _controller,
         builder: (context, child) {
           return Transform.scale(
-            scale: _scaleAnimation.value, // Animasyon değeri (1.0 -> 0.95)
+            scale: _scaleAnimation.value,
             child: widget.child,
           );
         },

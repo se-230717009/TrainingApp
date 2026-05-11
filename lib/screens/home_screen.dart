@@ -1,3 +1,15 @@
+/// lib/screens/home_screen.dart
+///
+/// Main shell screen for athletes (and unauthenticated guest users),
+/// composed of five tabs:
+///   0. Discover  — browse and search approved coaches.
+///   1. Lessons   — the athlete's lesson history ([MyLessonsScreen]).
+///   2. Messages  — conversations with coaches ([AthleteMessagesScreen]).
+///   3. Profile   — profile editing ([EditProfileScreen]).
+///   4. Settings  — app settings and sign-out.
+///
+/// Guest users (not signed in) can browse coaches but see prompts to
+/// register when they try to access lessons or messages.
 // ignore_for_file: unused_field, unused_element, deprecated_member_use, prefer_final_fields
 
 import 'package:flutter/material.dart';
@@ -13,7 +25,8 @@ import 'edit_profile_screen.dart';
 import 'my_lessons_screen.dart';
 import 'coach_detail_screen.dart';
 import 'athlete_messages_screen.dart'; // YENİ EKLENDİ
-import 'athlete_notifications_screen.dart'; // YENİ EKLENDİ
+import 'athlete_notifications_screen.dart';
+import '../widgets/settings_menu_item.dart';
 import 'dart:async';
 
 class HomeScreen extends StatefulWidget {
@@ -658,6 +671,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Builds the Settings tab.
+  ///
+  /// Authenticated users see a "Log Out" item; guests see "Log In".
   Widget _buildSettingsTab() {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -677,106 +693,56 @@ class _HomeScreenState extends State<HomeScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         children: [
-          _buildMenuItem(Icons.settings_outlined, "Uygulama Ayarları", () {}),
-          _buildMenuItem(
-            Icons.privacy_tip_outlined,
-            "Gizlilik Politikası",
-            () {},
+          SettingsMenuItem(
+            icon: Icons.settings_outlined,
+            label: "Uygulama Ayarları",
+            onTap: () {},
           ),
-          _buildMenuItem(Icons.help_outline, "Yardım & Destek", () {}),
+          SettingsMenuItem(
+            icon: Icons.privacy_tip_outlined,
+            label: "Gizlilik Politikası",
+            onTap: () {},
+          ),
+          SettingsMenuItem(
+            icon: Icons.help_outline,
+            label: "Yardım & Destek",
+            onTap: () {},
+          ),
           const Divider(color: Colors.white10, height: 30),
           if (!_isGuest)
-            _buildMenuItem(Icons.logout, "Çıkış Yap", () async {
-              await _authService.signOut();
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
-            }, isDestructive: true),
+            SettingsMenuItem(
+              icon: Icons.logout,
+              label: "Çıkış Yap",
+              onTap: () async {
+                await _authService.signOut();
+                if (mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
+                }
+              },
+              isDestructive: true,
+            ),
           if (_isGuest)
-            _buildMenuItem(Icons.login, "Giriş Yap", () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const WelcomeScreen()),
-              );
-            }),
+            SettingsMenuItem(
+              icon: Icons.login,
+              label: "Giriş Yap",
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                );
+              },
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildPlaceholderTab(String title, String message, IconData icon) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          title,
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 60, color: Colors.white.withOpacity(0.2)),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              style: GoogleFonts.poppins(color: Colors.white54, fontSize: 16),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuItem(
-    IconData icon,
-    String text,
-    VoidCallback onTap, {
-    bool isDestructive = false,
-  }) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: isDestructive
-              ? Colors.redAccent.withOpacity(0.1)
-              : Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          icon,
-          color: isDestructive ? Colors.redAccent : Colors.white,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        text,
-        style: GoogleFonts.poppins(
-          color: isDestructive ? Colors.redAccent : Colors.white,
-          fontWeight: FontWeight.w500,
-          fontSize: 15,
-        ),
-      ),
-      trailing: const Icon(
-        Icons.arrow_forward_ios_rounded,
-        color: Colors.white12,
-        size: 14,
-      ),
-      onTap: onTap,
-    );
-  }
+  // _buildPlaceholderTab and _buildMenuItem have been removed.
+  // Use the shared SettingsMenuItem widget for settings list items.
 
   Widget _buildQuickChip(
     String label,

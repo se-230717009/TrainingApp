@@ -1,3 +1,14 @@
+/// lib/screens/coach_home_screen.dart
+///
+/// Main shell screen for coaches, composed of five tabs:
+///   0. Dashboard  — profile preview and quick stats.
+///   1. Calendar   — weekly schedule ([CoachCalendarScreen]).
+///   2. Messages   — conversations with athletes ([CoachMessagesScreen]).
+///   3. Profile    — profile editing ([EditProfileScreen]).
+///   4. Settings   — app settings and sign-out.
+///
+/// Navigation between tabs is handled by [IndexedStack] so each tab
+/// preserves its scroll position when the user switches between them.
 // ignore_for_file: curly_braces_in_flow_control_structures, deprecated_member_use
 
 import 'package:flutter/material.dart';
@@ -13,6 +24,7 @@ import 'edit_profile_screen.dart';
 import 'coach_calender_screen.dart';
 import 'coach_messages_screen.dart';
 import 'coach_notification_screen.dart';
+import '../widgets/settings_menu_item.dart';
 
 class CoachHomeScreen extends StatefulWidget {
   const CoachHomeScreen({super.key});
@@ -27,7 +39,10 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
 
   int _selectedIndex = 0;
 
-  void _signOut() async {
+  /// Signs the coach out of Firebase Auth and Google, then navigates to
+  /// [LoginScreen] while clearing the entire navigation back stack so the
+  /// user cannot press Back to return to a protected screen.
+  Future<void> _signOut() async {
     await _authService.signOut();
     if (mounted) {
       Navigator.pushAndRemoveUntil(
@@ -238,18 +253,26 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         children: [
-          _buildMenuItem(Icons.settings_outlined, "Uygulama Ayarları", () {}),
-          _buildMenuItem(
-            Icons.privacy_tip_outlined,
-            "Gizlilik Politikası",
-            () {},
+          SettingsMenuItem(
+            icon: Icons.settings_outlined,
+            label: "Uygulama Ayarları",
+            onTap: () {},
           ),
-          _buildMenuItem(Icons.help_outline, "Yardım & Destek", () {}),
+          SettingsMenuItem(
+            icon: Icons.privacy_tip_outlined,
+            label: "Gizlilik Politikası",
+            onTap: () {},
+          ),
+          SettingsMenuItem(
+            icon: Icons.help_outline,
+            label: "Yardım & Destek",
+            onTap: () {},
+          ),
           const Divider(color: Colors.white10, height: 30),
-          _buildMenuItem(
-            Icons.logout,
-            "Çıkış Yap",
-            _signOut,
+          SettingsMenuItem(
+            icon: Icons.logout,
+            label: "Çıkış Yap",
+            onTap: _signOut,
             isDestructive: true,
           ),
         ],
@@ -576,41 +599,5 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 
-  Widget _buildMenuItem(
-    IconData icon,
-    String text,
-    VoidCallback onTap, {
-    bool isDestructive = false,
-  }) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: isDestructive
-              ? Colors.redAccent.withOpacity(0.1)
-              : Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(
-          icon,
-          color: isDestructive ? Colors.redAccent : Colors.white,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        text,
-        style: GoogleFonts.poppins(
-          color: isDestructive ? Colors.redAccent : Colors.white,
-          fontWeight: FontWeight.w500,
-          fontSize: 15,
-        ),
-      ),
-      trailing: const Icon(
-        Icons.arrow_forward_ios_rounded,
-        color: Colors.white12,
-        size: 14,
-      ),
-      onTap: onTap,
-    );
-  }
 }
+// _buildMenuItem removed — use the shared SettingsMenuItem widget instead.

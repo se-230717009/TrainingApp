@@ -1,12 +1,25 @@
+/// lib/widgets/social_login_button.dart
+///
+/// A white pill-shaped button used for OAuth provider sign-in flows.
+/// Currently used for Google sign-in on [LoginScreen] and [UserRegisterScreen].
+library;
 // lib/widgets/social_login_button.dart
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'scale_button.dart'; // Animasyonlu tıklama için
 
+/// A button styled for social / OAuth provider authentication.
+///
+/// Wraps a [ScaleButton] to provide a subtle press animation.
 class SocialLoginButton extends StatelessWidget {
+  /// The label displayed next to the provider icon (e.g. "Sign in with Google").
   final String text;
-  final String iconPath; // Google logosunun yolu (Asset)
+
+  /// Asset path to the provider's logo image (e.g. `'assets/icons/google.png'`).
+  final String iconPath;
+
+  /// Callback invoked when the button is tapped.
   final VoidCallback onPressed;
 
   const SocialLoginButton({

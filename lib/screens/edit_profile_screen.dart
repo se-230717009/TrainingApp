@@ -1,5 +1,13 @@
-// ignore_for_file: unused_field
+// ignore_for_file: unused_field, deprecated_member_use
 
+/// lib/screens/edit_profile_screen.dart
+///
+/// Profile editing screen for both athletes and coaches.
+/// Accessed from the Profile tab in the bottom navigation bar.
+///
+/// - Guest users (not signed in) see a friendly sign-in prompt.
+/// - Authenticated athletes can edit personal info, sports, and goals.
+/// - Authenticated coaches can edit bio, specialties, schedule, and location.
 import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -14,7 +22,9 @@ import '../core/utils/validators.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/scale_button.dart';
 import '../widgets/gradient_background.dart';
+import 'welcome_screen.dart';
 
+/// Profile editing screen — supports both athlete and coach profiles.
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -23,7 +33,8 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  final String _uid = FirebaseAuth.instance.currentUser!.uid;
+  /// The current user's UID — nullable so guests don't crash the app.
+  final String? _uid = FirebaseAuth.instance.currentUser?.uid;
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -122,7 +133,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    // Only load data if there is a signed-in user.
+    if (_uid != null) {
+      _loadUserData();
+    } else {
+      // No user — skip loading, leave _isLoading = false.
+      _isLoading = false;
+    }
   }
 
   // --- API KONUM METOTLARI ---
@@ -193,10 +210,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _loadUserData() async {
     try {
-      await _fetchCities(); // Önce şehirleri yükle ki konum eşleşebilsin
+      await _fetchCities();
       DocumentSnapshot doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(_uid)
+          .doc(_uid!) // safe: only called when _uid != null
           .get();
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -320,7 +337,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final storageRef = FirebaseStorage.instance
             .ref()
             .child('profile_pictures')
-            .child('$_uid.jpg');
+            .child('${_uid!}.jpg');
         await storageRef.putFile(_selectedImage!);
         newImageUrl = await storageRef.getDownloadURL();
       }
@@ -375,7 +392,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       await FirebaseFirestore.instance
           .collection('users')
-          .doc(_uid)
+          .doc(_uid!)
           .update(updateData);
 
       if (mounted) {
@@ -570,7 +587,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       selectedColor: ColorConstants.primaryColor,
                       backgroundColor: Colors.white10,
                       labelStyle: GoogleFonts.poppins(
-                        color: isSel ? Colors.black : Colors.white,
+                        color: Colors.black,
                         fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
                       ),
                       onSelected: (val) {
@@ -631,23 +648,104 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ----- Guest guard -----
+    // If no user is signed in, show a friendly prompt instead of crashing.
+    if (_uid == null) {
+      return GradientBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            backgroundColor: Colors.black.withOpacity(0.6),
+            elevation: 0,
+            automaticallyImplyLeading: false,
+            title: Text(
+              "Profil",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(30),
+                    decoration: BoxDecoration(
+                      color: ColorConstants.primaryColor.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.person_outline_rounded,
+                      size: 70,
+                      color: ColorConstants.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    "Profilini Görüntülemek İçin Giriş Yap ya da kayıt ol.",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ColorConstants.primaryColor,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      "Giriş Yap / Kayıt Ol",
+                      style: GoogleFonts.poppins(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ----- Authenticated user view -----
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          backgroundColor: Colors.black,
+          // Semi-transparent to match MyLessonsScreen / AthleteMessagesScreen.
+          backgroundColor: Colors.black.withOpacity(0.6),
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
+          // No back button — this screen is a tab inside the bottom nav bar.
+          automaticallyImplyLeading: false,
           title: Text(
-            "Profili Düzenle",
+            "Profilim",
             style: GoogleFonts.poppins(
               color: Colors.white,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -659,7 +757,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               )
             : SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.only(
+                  // Push content below the transparent AppBar.
+                  top: MediaQuery.of(context).padding.top + kToolbarHeight + 16,
+                  left: 24,
+                  right: 24,
+                  bottom: 24,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -780,7 +884,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           return ChoiceChip(
                             label: Text(sport),
                             labelStyle: GoogleFonts.poppins(
-                              color: isSelected ? Colors.black : Colors.white,
+                              color: Colors.black,
                               fontWeight: isSelected
                                   ? FontWeight.bold
                                   : FontWeight.w600,
