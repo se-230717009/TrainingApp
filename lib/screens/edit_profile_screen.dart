@@ -139,7 +139,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           (a, b) => a['name'].toString().compareTo(b['name'].toString()),
         );
       }
-    } catch (e) {
     } finally {
       if (mounted) setState(() => _isLoadingLocation = false);
     }
@@ -164,7 +163,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           (a, b) => a['name'].toString().compareTo(b['name'].toString()),
         );
       }
-    } catch (e) {
     } finally {
       if (mounted) setState(() => _isLoadingLocation = false);
     }
@@ -188,7 +186,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           (a, b) => a['name'].toString().compareTo(b['name'].toString()),
         );
       }
-    } catch (e) {
     } finally {
       if (mounted) setState(() => _isLoadingLocation = false);
     }
@@ -275,8 +272,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.image,
       );
-      if (result != null)
+      if (result != null) {
         setState(() => _selectedImage = File(result.files.single.path!));
+      }
     } catch (e) {
       _showError("Fotoğraf seçilemedi: $e");
     }
@@ -291,16 +289,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       String? weightError = Validators.validateWeight(_weightController.text);
       if (weightError != null) return _showError(weightError);
     } else if (_userType == 'coach') {
-      if (_selectedSpecialties.isEmpty)
+      if (_selectedSpecialties.isEmpty) {
         return _showError("Lütfen en az bir uzmanlık alanı seçin.");
-      if (_priceController.text.trim().isEmpty)
+      }
+      if (_priceController.text.trim().isEmpty) {
         return _showError("Saatlik ücret boş olamaz.");
+      }
       if (_deliveryMode == null) return _showError("Çalışma şeklini seçin.");
       if (_lessonFormat == null) return _showError("Ders formatını seçin.");
-      if (_coachCharacter == null)
+      if (_coachCharacter == null) {
         return _showError("Eğitmen karakterinizi seçin.");
-      if (_dayHoursMap.isEmpty)
+      }
+      if (_dayHoursMap.isEmpty) {
         return _showError("Lütfen müsaitlik durumunuzu belirleyin.");
+      }
       if (_needsLocation &&
           (_selectedCity == null ||
               _selectedDistrict == null ||
@@ -573,10 +575,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       onSelected: (val) {
                         setDialogState(() {
-                          if (val)
+                          if (val) {
                             tempHours.add(h);
-                          else
+                          } else {
                             tempHours.remove(h);
+                          }
                         });
                       },
                     );
@@ -595,10 +598,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   onPressed: () {
                     // Hem Ana Ekranı Hem de BottomSheet'i Güncelle
                     setState(() {
-                      if (tempHours.isEmpty)
+                      if (tempHours.isEmpty) {
                         _dayHoursMap.remove(day);
-                      else
+                      } else {
                         _dayHoursMap[day] = tempHours;
+                      }
                     });
                     setModalState(() {});
                     Navigator.pop(context);
@@ -1041,8 +1045,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           (val) {
                             if (val != null &&
                                 val != "Önce İlçe Seçin" &&
-                                val != "Seçenek bulunamadı")
+                                val != "Seçenek bulunamadı") {
                               setState(() => _selectedNeighborhood = val);
+                            }
                           },
                         ),
                         const SizedBox(height: 16),

@@ -375,14 +375,16 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
               .orderBy('timestamp', descending: true)
               .snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting)
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
                 child: CircularProgressIndicator(
                   color: ColorConstants.primaryColor,
                 ),
               );
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
               return _buildEmptyState(context);
+            }
 
             return ListView.builder(
               padding: EdgeInsets.only(
