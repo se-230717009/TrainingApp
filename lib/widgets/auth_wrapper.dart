@@ -2,18 +2,8 @@
 ///
 /// Root widget that listens to Firebase Auth state changes and routes the
 /// user to the correct screen on app start.
-///
-/// Decision tree:
-///   1. Auth state loading  → show a loading spinner.
-///   2. No authenticated user → show [HomeScreen] (guest mode).
-///   3. Authenticated user:
-///        a. Fetch Firestore profile.
-///        b. Profile missing → [OnboardingScreen] (new user).
-///        c. Onboarding complete + coach  → [CoachHomeScreen].
-///        d. Onboarding complete + athlete → [HomeScreen].
-///        e. Onboarding incomplete + coach  → [CoachOnboardingScreen].
-///        f. Onboarding incomplete + athlete → [OnboardingScreen].
 library;
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -34,6 +24,7 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
+        // Bağlantı bekletiliyor...
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: Colors.black,
@@ -45,13 +36,12 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // 2. Kullanıcı çıkış yapmışsa veya hiç girmemişse Welcome ekranına yönlendir
-        // 2. Kullanıcı çıkış yapmışsa veya hiç girmemişse Ana Ekrana (Misafir) yönlendir
+        // 2. Kullanıcı giriş yapmamışsa direkt ana sayfaya (misafir modu) gönder
         if (!snapshot.hasData || snapshot.data == null) {
           return const HomeScreen();
         }
 
-        // 3. Kullanıcı oturum açmış. Firestore'dan doğrudan rol ve form durumunu çek.
+        // 3. Kullanıcı giriş yapmışsa Firestore'dan profilini kontrol et
         return FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance
               .collection('users')
@@ -72,14 +62,15 @@ class AuthWrapper extends StatelessWidget {
             if (userSnapshot.hasError ||
                 !userSnapshot.hasData ||
                 !userSnapshot.data!.exists) {
-              // Veritabanında belge yoksa yeni kullanıcıdır, standart Onboarding'e yönlendir.
-              return const OnboardingScreen();
+              // Veritabanında belge yoksa yeni kullanıcıdır, Onboarding'e yönlendir.
+              // 'const' kaldırıldı çünkü Onboarding artık servis bağımlılığı alıyor.
+              return OnboardingScreen();
             }
 
             final userData = userSnapshot.data!.data() as Map<String, dynamic>;
             final bool isCoach = userData['userType'] == 'coach';
 
-            // Onboarding ekranlarında kaydedilen doğru anahtar kontrol ediliyor.
+            // Onboarding tamamlanma durumu kontrol ediliyor.
             final bool isOnboardingCompleted =
                 userData['isOnboardingCompleted'] == true;
 
@@ -87,9 +78,8 @@ class AuthWrapper extends StatelessWidget {
             if (isOnboardingCompleted) {
               return isCoach ? const CoachHomeScreen() : const HomeScreen();
             } else {
-              return isCoach
-                  ? const CoachOnboardingScreen()
-                  : const OnboardingScreen();
+              // 'const' ifadeleri kaldırıldı.
+              return isCoach ? CoachOnboardingScreen() : OnboardingScreen();
             }
           },
         );

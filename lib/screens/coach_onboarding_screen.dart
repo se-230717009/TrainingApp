@@ -8,12 +8,23 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
 import '../services/auth_service.dart';
+import '../services/email_verification_service.dart';
+import '../services/interfaces/i_auth_service.dart';
+import '../services/interfaces/i_email_verification_service.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/scale_button.dart';
 import 'coach_home_screen.dart';
 
 class CoachOnboardingScreen extends StatefulWidget {
-  const CoachOnboardingScreen({super.key});
+  final IAuthService authService;
+  final IEmailVerificationService verificationService;
+
+  CoachOnboardingScreen({
+    super.key,
+    IAuthService? authService,
+    IEmailVerificationService? verificationService,
+  }) : authService = authService ?? AuthService(),
+       verificationService = verificationService ?? EmailVerificationService();
 
   @override
   State<CoachOnboardingScreen> createState() => _CoachOnboardingScreenState();
@@ -21,9 +32,9 @@ class CoachOnboardingScreen extends StatefulWidget {
 
 class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   final PageController _pageController = PageController();
-  final AuthService _authService = AuthService();
   int _currentIndex = 0;
   bool _isLoading = false;
+  bool _isEmailVerified = false;
 
   final List<String> _selectedSpecialties = [];
   final TextEditingController _priceController = TextEditingController();
@@ -89,14 +100,44 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   ];
 
   bool get _needsLocation =>
-      _deliveryMode == "Yüzyüze" ||
-      _deliveryMode == "Farketmez" ||
-      _deliveryMode == "Hibrit(İkisi de)";
+      _deliveryMode == "Yüzyüze" || _deliveryMode == "Hibrit(İkisi de)";
 
   @override
   void initState() {
     super.initState();
     _fetchCities();
+    _checkInitialEmailStatus();
+  }
+
+  void _checkInitialEmailStatus() async {
+    await widget.verificationService.reloadUser();
+    bool verified = await widget.verificationService.isEmailVerified();
+    if (mounted) {
+      setState(() => _isEmailVerified = verified);
+      if (!verified) await widget.verificationService.sendVerificationEmail();
+    }
+  }
+
+  void _checkVerificationManually() async {
+    setState(() => _isLoading = true);
+    await widget.verificationService.reloadUser();
+    bool verified = await widget.verificationService.isEmailVerified();
+    if (mounted) {
+      setState(() {
+        _isEmailVerified = verified;
+        _isLoading = false;
+      });
+      if (verified) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("E-posta henüz onaylanmamış.")),
+        );
+      }
+    }
   }
 
   Future<void> _fetchCities() async {
@@ -178,11 +219,12 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
 
   List<Widget> get _pages {
     List<Widget> p = [
+      _buildStep0EmailVerification(),
       _buildStep1SpecialtiesAndPrice(),
       _buildStep2Bio(),
       _buildStep3References(),
       _buildStep4DeliveryMode(),
-      _buildStepLessonFormat(), // YENİ EKLENDİ
+      _buildStepLessonFormat(), // HATAYI VEREN EKSİK KISIM BUYDU, ARTIK BURADA!
     ];
     if (_needsLocation) p.add(_buildStepLocation());
     p.add(_buildStep5Availability());
@@ -196,11 +238,12 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
       );
-      if (result != null)
+      if (result != null) {
         setState(() {
           _selectedFile = File(result.files.single.path!);
           _fileName = result.files.single.name;
         });
+      }
     } catch (e) {
       _showError("Dosya seçilirken bir hata oluştu.");
     }
@@ -209,26 +252,28 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   void _nextPage() {
     final int totalPages = _pages.length;
 
-    if (_currentIndex == 0 &&
+    if (_currentIndex == 0 && !_isEmailVerified)
+      return _showError("Lütfen devam etmeden önce e-postanızı onaylayın.");
+    if (_currentIndex == 1 &&
         (_selectedSpecialties.isEmpty || _priceController.text.trim().isEmpty))
       return _showError(
         "Lütfen uzmanlık alanınızı ve saatlik ücretinizi girin.",
       );
-    if (_currentIndex == 1 &&
+    if (_currentIndex == 2 &&
         (_bioController.text.trim().isEmpty ||
             _bioController.text.trim().length < 20))
       return _showError("Hakkında kısmı en az 20 karakter olmalıdır.");
-    if (_currentIndex == 2 &&
+    if (_currentIndex == 3 &&
         _referenceController.text.trim().isEmpty &&
         _selectedFile == null)
       return _showError("Lütfen bir referans linki girin veya belge yükleyin.");
-    if (_currentIndex == 3 && _deliveryMode == null)
+    if (_currentIndex == 4 && _deliveryMode == null)
       return _showError("Lütfen çalışma şeklini seçin.");
-    if (_currentIndex == 4 && _lessonFormat == null)
-      return _showError("Lütfen verdiğiniz ders tipini seçin.");
+    if (_currentIndex == 5 && _lessonFormat == null)
+      return _showError("Lütfen verdiğiniz ders formatını seçin.");
 
     if (_needsLocation) {
-      if (_currentIndex == 5 &&
+      if (_currentIndex == 6 &&
           (_selectedCity == null ||
               _selectedDistrict == null ||
               _selectedNeighborhood == null ||
@@ -237,14 +282,14 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         return _showError(
           "Lütfen il, ilçe ve adres bilgilerini eksiksiz doldurun.",
         );
+      if (_currentIndex == 7 && _dayHoursMap.isEmpty)
+        return _showError("Lütfen en az bir gün için saat aralığı belirleyin.");
+      if (_currentIndex == 8 && _coachCharacter == null)
+        return _showError("Lütfen eğitmen karakterinizi seçin.");
+    } else {
       if (_currentIndex == 6 && _dayHoursMap.isEmpty)
         return _showError("Lütfen en az bir gün için saat aralığı belirleyin.");
       if (_currentIndex == 7 && _coachCharacter == null)
-        return _showError("Lütfen eğitmen karakterinizi seçin.");
-    } else {
-      if (_currentIndex == 5 && _dayHoursMap.isEmpty)
-        return _showError("Lütfen en az bir gün için saat aralığı belirleyin.");
-      if (_currentIndex == 6 && _coachCharacter == null)
         return _showError("Lütfen eğitmen karakterinizi seçin.");
     }
 
@@ -260,10 +305,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: GoogleFonts.poppins()),
-        backgroundColor: Colors.redAccent,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
     );
   }
 
@@ -303,7 +345,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         'bio': _bioController.text.trim(),
         'referenceLinks': referenceLinks,
         'deliveryMode': _deliveryMode,
-        'lessonFormat': _lessonFormat, // Yeni
+        'lessonFormat': _lessonFormat,
         'availableDays': finalDays,
         'availableHours': finalHours,
         'dayHoursMap': _dayHoursMap,
@@ -322,13 +364,14 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         };
       }
 
-      await _authService.updateUserProfile(uid: uid, data: updateData);
-      if (mounted)
+      await widget.authService.updateUserProfile(uid: uid, data: updateData);
+      if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const CoachHomeScreen()),
           (route) => false,
         );
+      }
     } catch (e) {
       _showError("Hata: $e");
     } finally {
@@ -339,7 +382,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final currentPages = _pages;
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(
@@ -348,12 +390,12 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
                   colors: [
                     Color.fromARGB(255, 51, 48, 48),
                     Color.fromARGB(255, 10, 10, 10),
                   ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
               ),
             ),
@@ -420,6 +462,55 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
+  // --- ADIM 0: E-POSTA ONAY ---
+  Widget _buildStep0EmailVerification() {
+    return _buildStepContainer(
+      title: "E-posta Aktivasyonu",
+      subtitle:
+          "Kayıt işlemini bitirebilmeniz için e-postanızı onaylamanız gerekiyor.",
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: ColorConstants.primaryColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.mark_email_read_rounded,
+              color: ColorConstants.primaryColor,
+              size: 64,
+            ),
+          ),
+          const SizedBox(height: 32),
+          Text(
+            "Lütfen e-posta adresinize gönderilen linke tıklayın. Ardından aşağıdaki butona basarak devam edebilirsiniz.",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+          ),
+          const SizedBox(height: 40),
+          CustomButton(
+            text: "Doğrulamayı Kontrol Et",
+            onPressed: _checkVerificationManually,
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () => widget.verificationService.sendVerificationEmail(),
+            child: Text(
+              "Onay kodunu tekrar gönder",
+              style: GoogleFonts.poppins(
+                color: ColorConstants.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- ADIM 1: UZMANLIK VE ÜCRET ---
   Widget _buildStep1SpecialtiesAndPrice() {
     return _buildStepContainer(
       title: "Uzmanlık ve Ücret",
@@ -436,9 +527,8 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                 return ChoiceChip(
                   label: Text(specialty),
                   labelStyle: GoogleFonts.poppins(
-                    color: isSelected
-                        ? Colors.black
-                        : const Color.fromARGB(179, 9, 9, 9),
+                    color: Colors.black, // Siyah Yazı (Okunabilirlik için)
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                   ),
                   selected: isSelected,
                   selectedColor: ColorConstants.primaryColor,
@@ -485,6 +575,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
+  // --- ADIM 2: BİO ---
   Widget _buildStep2Bio() {
     return _buildStepContainer(
       title: "Hakkında",
@@ -509,6 +600,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
+  // --- ADIM 3: REFERANSLAR ---
   Widget _buildStep3References() {
     return _buildStepContainer(
       title: "Referansların",
@@ -565,48 +657,95 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
+  // --- ADIM 4: ÇALIŞMA ŞEKLİ (WRAP İLE OVERFLOW ÖNLENDİ) ---
   Widget _buildStep4DeliveryMode() {
     return _buildStepContainer(
       title: "Çalışma Şekli",
       subtitle: "Öğrencilerinle dersleri nasıl işleyeceksin?",
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _buildModeButton("Online", Icons.wifi, true),
-              const SizedBox(width: 10),
-              _buildModeButton("Yüzyüze", Icons.people, true),
-              const SizedBox(width: 10),
-              _buildModeButton("Hibrit(İkisi de)", Icons.compare_arrows, true),
-            ],
-          ),
-        ],
+      child: SingleChildScrollView(
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _buildModeButton("Online", Icons.wifi, true),
+            _buildModeButton("Yüzyüze", Icons.people, true),
+            _buildModeButton("Hibrit(İkisi de)", Icons.compare_arrows, true),
+          ],
+        ),
       ),
     );
   }
 
-  // --- YENİ ADIM: DERS FORMATI ---
+  // --- ADIM 5: DERS FORMATI (WRAP İLE OVERFLOW ÖNLENDİ) ---
   Widget _buildStepLessonFormat() {
     return _buildStepContainer(
       title: "Ders Formatı",
       subtitle: "Nasıl dersler vereceksiniz?",
-      child: Column(
-        children: [
-          Row(
-            children: [
-              _buildModeButton("Özel Ders", Icons.person, false),
-              const SizedBox(width: 10),
-              _buildModeButton("Grup Dersi", Icons.groups, false),
-              const SizedBox(width: 10),
-              _buildModeButton("İkisi de", Icons.all_inclusive_rounded, false),
-            ],
-          ),
-        ],
+      child: SingleChildScrollView(
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _buildModeButton("Özel Ders", Icons.person, false),
+            _buildModeButton("Grup Dersi", Icons.groups, false),
+            _buildModeButton("İkisi de", Icons.all_inclusive_rounded, false),
+          ],
+        ),
       ),
     );
   }
 
+  // ESNEMEYEN / TAŞMAYAN (NO-OVERFLOW) BUTON MİMARİSİ
+  Widget _buildModeButton(String label, IconData icon, bool isDelivery) {
+    final isSelected = isDelivery
+        ? _deliveryMode == label
+        : _lessonFormat == label;
+    return GestureDetector(
+      onTap: () => setState(() {
+        if (isDelivery) {
+          _deliveryMode = label;
+        } else {
+          _lessonFormat = label;
+        }
+      }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? ColorConstants.primaryColor : Colors.white10,
+          borderRadius: BorderRadius.circular(16),
+          border: isSelected
+              ? Border.all(color: ColorConstants.primaryColor)
+              : null,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 90),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? Colors.black : Colors.white,
+                size: 24,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: isSelected ? Colors.black : Colors.white,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- ADIM 6: KONUM ---
   Widget _buildStepLocation() {
     return _buildStepContainer(
       title: "Konum Bilgileri",
@@ -675,8 +814,9 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                   (val) {
                     if (val != null &&
                         val != "Önce İlçe Seçin" &&
-                        val != "Seçenek bulunamadı")
+                        val != "Seçenek bulunamadı") {
                       setState(() => _selectedNeighborhood = val);
+                    }
                   },
                 ),
                 const SizedBox(height: 24),
@@ -695,7 +835,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  "Adres Başlığı",
+                  "Adres Başlığı (Haritada Görünecek)",
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -730,6 +870,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
+  // --- ADIM 7: ÇALIŞMA SAATLERİ (POP-UP) ---
   Widget _buildStep5Availability() {
     return _buildStepContainer(
       title: "Çalışma Saatleri",
@@ -741,6 +882,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
           String day = _daysList[index];
           List<String> selectedHours = _dayHoursMap[day] ?? [];
           bool isSelected = selectedHours.isNotEmpty;
+
           return ListTile(
             onTap: () => _showHoursPopup(day),
             tileColor: isSelected
@@ -773,7 +915,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
               ),
             ),
             trailing: Icon(
-              Icons.timelapse_rounded,
+              Icons.timelapse,
               color: isSelected ? ColorConstants.primaryColor : Colors.white54,
             ),
           );
@@ -813,15 +955,16 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                       selectedColor: ColorConstants.primaryColor,
                       backgroundColor: Colors.white10,
                       labelStyle: GoogleFonts.poppins(
-                        color: Colors.black,
+                        color: Colors.black, // Siyah Yazı
                         fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
                       ),
                       onSelected: (val) {
                         setDialogState(() {
-                          if (val)
+                          if (val) {
                             tempHours.add(h);
-                          else
+                          } else {
                             tempHours.remove(h);
+                          }
                         });
                       },
                     );
@@ -839,10 +982,11 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
-                      if (tempHours.isEmpty)
+                      if (tempHours.isEmpty) {
                         _dayHoursMap.remove(day);
-                      else
+                      } else {
                         _dayHoursMap[day] = tempHours;
+                      }
                     });
                     Navigator.pop(context);
                   },
@@ -868,6 +1012,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
+  // --- ADIM 8: EĞİTMEN KARAKTERİ ---
   Widget _buildStep6Character() {
     return _buildStepContainer(
       title: "Eğitmen Karakterin",
@@ -901,7 +1046,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black,
+                        color: isSelected ? Colors.black : Colors.white,
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
@@ -948,54 +1093,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  Widget _buildModeButton(String label, IconData icon, bool isDelivery) {
-    final isSelected = isDelivery
-        ? _deliveryMode == label
-        : _lessonFormat == label;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() {
-          if (isDelivery)
-            _deliveryMode = label;
-          else
-            _lessonFormat = label;
-        }),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? ColorConstants.primaryColor : Colors.white10,
-            borderRadius: BorderRadius.circular(12),
-            border: isSelected
-                ? Border.all(color: ColorConstants.primaryColor)
-                : null,
-          ),
-          child: Column(
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.black : Colors.white,
-                size: 20,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  color: isSelected ? Colors.black : Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildDropdown(
     String label,
     List<String> items,
@@ -1007,6 +1104,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     final safeValue = uniqueItems.contains(selectedValue)
         ? selectedValue
         : null;
+
     return DropdownButtonFormField<String>(
       value: safeValue,
       isExpanded: true,

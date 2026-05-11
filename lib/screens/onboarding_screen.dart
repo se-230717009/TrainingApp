@@ -1,17 +1,29 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
-import '../core/utils/validators.dart'; // YENİ: Doğrulama kütüphanesi eklendi
+import '../core/utils/validators.dart';
 import '../services/auth_service.dart';
+import '../services/email_verification_service.dart';
+import '../services/interfaces/i_auth_service.dart';
+import '../services/interfaces/i_email_verification_service.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/scale_button.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  final IAuthService authService;
+  final IEmailVerificationService verificationService;
+
+  OnboardingScreen({
+    super.key,
+    IAuthService? authService,
+    IEmailVerificationService? verificationService,
+  }) : authService = authService ?? AuthService(),
+       verificationService = verificationService ?? EmailVerificationService();
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -19,10 +31,11 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
-  final AuthService _authService = AuthService();
   int _currentIndex = 0;
   bool _isLoading = false;
+  bool _isEmailVerified = false;
 
+  // Form verileri
   String? _selectedGoal;
   List<String> _selectedSports = [];
   String? _coachingType;
@@ -35,9 +48,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String? _preferredCoachGender;
   List<String> _selectedDays = [];
   List<String> _selectedHours = [];
-
-  int _minPrice = 0;
-  int _maxPrice = 0;
 
   final List<String> _daysList = [
     "Pazartesi",
@@ -81,77 +91,69 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     "İleri Seviye",
   ];
 
-  Future<void> _calculateEstimatedPrice() async {
-    if (_selectedSports.isEmpty) {
-      setState(() {
-        _minPrice = 0;
-        _maxPrice = 0;
-      });
-      return;
-    }
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('userType', isEqualTo: 'coach')
-          .where('lessonSport', whereIn: _selectedSports)
-          .get();
-      if (snapshot.docs.isNotEmpty) {
-        List<int> prices = snapshot.docs
-            .map((d) => (d.data()['hourlyRate'] ?? 0) as int)
-            .where((p) => p > 0)
-            .toList();
-        if (prices.isNotEmpty) {
-          prices.sort();
-          setState(() {
-            _minPrice = prices.first;
-            _maxPrice = prices.last;
-          });
-          return;
-        }
+  @override
+  void initState() {
+    super.initState();
+    _checkInitialEmailStatus();
+  }
+
+  void _checkInitialEmailStatus() async {
+    await widget.verificationService.reloadUser();
+    bool verified = await widget.verificationService.isEmailVerified();
+    if (mounted) {
+      setState(() => _isEmailVerified = verified);
+      if (!verified) {
+        await widget.verificationService.sendVerificationEmail();
       }
+    }
+  }
+
+  void _checkVerificationManually() async {
+    setState(() => _isLoading = true);
+    await widget.verificationService.reloadUser();
+    bool verified = await widget.verificationService.isEmailVerified();
+    if (mounted) {
       setState(() {
-        _minPrice = 400;
-        _maxPrice = 1500;
+        _isEmailVerified = verified;
+        _isLoading = false;
       });
-    } catch (e) {
-      setState(() {
-        _minPrice = 400;
-        _maxPrice = 1500;
-      });
+      if (verified) {
+        _pageController.nextPage(
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      } else {
+        _showError("E-posta henüz onaylanmamış görünüyor.");
+      }
     }
   }
 
   void _nextPage() {
-    if (_currentIndex == 0 && _selectedGoal == null)
+    if (_currentIndex == 0 && !_isEmailVerified)
+      return _showError("Lütfen devam etmeden önce e-postanızı onaylayın.");
+    if (_currentIndex == 1 && _selectedGoal == null)
       return _showError("Hedef seçin.");
-    if (_currentIndex == 1 && _selectedSports.isEmpty)
+    if (_currentIndex == 2 && _selectedSports.isEmpty)
       return _showError("Branş seçin.");
-    if (_currentIndex == 2 && _coachingType == null)
+    if (_currentIndex == 3 && _coachingType == null)
       return _showError("Çalışma tipi seçin.");
-    if (_currentIndex == 3 && _preferredLessonFormat == null)
+    if (_currentIndex == 4 && _preferredLessonFormat == null)
       return _showError("Ders formatı seçin.");
 
-    // --- YENİ EKLENEN DOĞRULAMA (VÜCUT ANALİZİ) ---
-    if (_currentIndex == 4) {
-      if (_gender == null) return _showError("Lütfen cinsiyetinizi seçin.");
-
-      String? ageError = Validators.validateAge(_ageController.text);
-      if (ageError != null) return _showError(ageError);
-
-      String? heightError = Validators.validateHeight(_heightController.text);
-      if (heightError != null) return _showError(heightError);
-
-      String? weightError = Validators.validateWeight(_weightController.text);
-      if (weightError != null) return _showError(weightError);
+    if (_currentIndex == 5) {
+      if (_gender == null) return _showError("Cinsiyet seçin.");
+      String? ageErr = Validators.validateAge(_ageController.text);
+      if (ageErr != null) return _showError(ageErr);
+      String? hErr = Validators.validateHeight(_heightController.text);
+      if (hErr != null) return _showError(hErr);
+      String? wErr = Validators.validateWeight(_weightController.text);
+      if (wErr != null) return _showError(wErr);
     }
 
-    if (_currentIndex == 5 && _experienceLevel == null)
+    if (_currentIndex == 6 && _experienceLevel == null)
       return _showError("Deneyim seçin.");
-    if (_currentIndex == 6 &&
-        (_preferredCoachGender == null || _selectedDays.isEmpty))
-      return _showError("Müsaitlik ve antrenör tercihini yapın.");
 
-    if (_currentIndex < 6) {
+    if (_currentIndex < 7) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
@@ -170,8 +172,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _finishOnboarding() async {
     setState(() => _isLoading = true);
     try {
-      final uid = FirebaseAuth.instance.currentUser!.uid;
-      await _authService.updateUserProfile(
+      final String uid = FirebaseAuth.instance.currentUser!.uid;
+      await widget.authService.updateUserProfile(
         uid: uid,
         data: {
           'goal': _selectedGoal,
@@ -179,9 +181,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'coachingType': _coachingType,
           'preferredLessonFormat': _preferredLessonFormat,
           'gender': _gender,
-          'age': _ageController.text.trim(),
-          'height': _heightController.text.trim(),
-          'weight': _weightController.text.trim(),
+          'age': _ageController.text,
+          'height': _heightController.text,
+          'weight': _weightController.text,
           'experienceLevel': _experienceLevel,
           'preferredCoachGender': _preferredCoachGender,
           'availableDays': _selectedDays,
@@ -190,10 +192,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         },
       );
       if (mounted)
-        Navigator.pushAndRemoveUntil(
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (route) => false,
         );
     } catch (e) {
       _showError("Hata: $e");
@@ -222,44 +223,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           SafeArea(
             child: Column(
               children: [
-                if (_minPrice > 0)
-                  Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 10,
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: ColorConstants.primaryColor.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: ColorConstants.primaryColor.withOpacity(0.5),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.insights_rounded,
-                          color: ColorConstants.primaryColor,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            "Ortalama Saatlik Ücret: $_minPrice ₺ - $_maxPrice ₺",
-                            style: GoogleFonts.poppins(
-                              color: ColorConstants.primaryColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -269,7 +232,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     children: [
                       Expanded(
                         child: LinearProgressIndicator(
-                          value: (_currentIndex + 1) / 7,
+                          value: (_currentIndex + 1) / 8,
                           backgroundColor: Colors.white10,
                           color: ColorConstants.primaryColor,
                           minHeight: 6,
@@ -277,7 +240,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       const SizedBox(width: 15),
                       Text(
-                        "${_currentIndex + 1}/7",
+                        "${_currentIndex + 1}/8",
                         style: GoogleFonts.poppins(
                           color: Colors.white54,
                           fontWeight: FontWeight.bold,
@@ -293,13 +256,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     onPageChanged: (index) =>
                         setState(() => _currentIndex = index),
                     children: [
+                      _buildStep0EmailVerification(),
                       _buildStep1Goal(),
                       _buildStep2Sports(),
                       _buildStep3CoachingType(),
-                      _buildStepLessonFormat(),
-                      _buildStep4Stats(),
-                      _buildStep5Experience(),
-                      _buildStep6Preferences(),
+                      _buildStep4LessonFormat(),
+                      _buildStep5Stats(),
+                      _buildStep6Experience(),
+                      _buildStep7Preferences(),
                     ],
                   ),
                 ),
@@ -310,7 +274,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           color: ColorConstants.primaryColor,
                         )
                       : CustomButton(
-                          text: _currentIndex == 6 ? "Tamamla" : "Devam Et",
+                          text: _currentIndex == 7 ? "Tamamla" : "Devam Et",
                           onPressed: _nextPage,
                         ),
                 ),
@@ -322,279 +286,49 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildStep1Goal() {
+  Widget _buildStep0EmailVerification() {
     return _buildStepContainer(
-      title: "Hedefin Ne?",
-      subtitle: "Seni motive eden asıl sebep nedir?",
-      child: ListView.separated(
-        itemCount: _goals.length,
-        separatorBuilder: (c, i) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final goal = _goals[index];
-          return _buildSelectableCard(
-            text: goal,
-            isSelected: _selectedGoal == goal,
-            onTap: () => setState(() => _selectedGoal = goal),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildStep2Sports() {
-    return _buildStepContainer(
-      title: "İlgi Alanların",
-      subtitle: "Hangi branşlarla ilgileniyorsun?",
-      child: SingleChildScrollView(
-        child: Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: _sports.map((sport) {
-            final isSelected = _selectedSports.contains(sport);
-            return ChoiceChip(
-              label: Text(sport),
-              selected: isSelected,
-              selectedColor: ColorConstants.primaryColor,
-              backgroundColor: Colors.white10,
-              onSelected: (selected) {
-                setState(() {
-                  selected
-                      ? _selectedSports.add(sport)
-                      : _selectedSports.remove(sport);
-                  _calculateEstimatedPrice();
-                });
-              },
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStep3CoachingType() {
-    return _buildStepContainer(
-      title: "Nasıl Çalışmak İstersin?",
-      subtitle: "Sana en uygun antrenörleri buna göre listeleyeceğiz.",
+      title: "E-posta Aktivasyonu",
+      subtitle:
+          "Kayıt işlemini bitirebilmeniz için e-postanızı onaylamanız gerekiyor.",
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _buildSelectableCardWithIcon(
-            text: "Online Koçluk",
-            subtext: "Uzaktan takip, program ve analiz.",
-            icon: Icons.wifi,
-            isSelected: _coachingType == "Online Koçluk",
-            onTap: () => setState(() => _coachingType = "Online Koçluk"),
+          Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: ColorConstants.primaryColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.mark_email_read_rounded,
+              color: ColorConstants.primaryColor,
+              size: 64,
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildSelectableCardWithIcon(
-            text: "Birebir (Yüzyüze)",
-            subtext: "Spor salonunda veya dışarıda buluşarak.",
-            icon: Icons.people_alt_outlined,
-            isSelected: _coachingType == "Birebir (Yüzyüze)",
-            onTap: () => setState(() => _coachingType = "Birebir (Yüzyüze)"),
+          const SizedBox(height: 32),
+          Text(
+            "Lütfen e-posta adresinize gönderilen linke tıklayın. Ardından aşağıdaki butona basarak devam edebilirsiniz.",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
           ),
-          const SizedBox(height: 16),
-          _buildSelectableCardWithIcon(
-            text: "Farketmez",
-            subtext: "Hem online hem yüzyüze çalışabilirim.",
-            icon: Icons.compare_arrows_rounded,
-            isSelected: _coachingType == "Farketmez",
-            onTap: () => setState(() => _coachingType = "Farketmez"),
+          const SizedBox(height: 40),
+          CustomButton(
+            text: "Doğrulamayı Kontrol Et",
+            onPressed: _checkVerificationManually,
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () => widget.verificationService.sendVerificationEmail(),
+            child: Text(
+              "Onay kodunu tekrar gönder",
+              style: GoogleFonts.poppins(
+                color: ColorConstants.primaryColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildStepLessonFormat() {
-    return _buildStepContainer(
-      title: "Ders Formatı",
-      subtitle: "Eğitimlerini nasıl almak istiyorsun?",
-      child: Column(
-        children: [
-          _buildSelectableCardWithIcon(
-            text: "Özel Ders",
-            subtext: "Eğitmen ile birebir özel ders.",
-            icon: Icons.person,
-            isSelected: _preferredLessonFormat == "Özel Ders",
-            onTap: () => setState(() => _preferredLessonFormat = "Özel Ders"),
-          ),
-          const SizedBox(height: 16),
-          _buildSelectableCardWithIcon(
-            text: "Grup Dersi",
-            subtext: "Küçük gruplar halinde motivasyonlu ders.",
-            icon: Icons.groups,
-            isSelected: _preferredLessonFormat == "Grup Dersi",
-            onTap: () => setState(() => _preferredLessonFormat = "Grup Dersi"),
-          ),
-          const SizedBox(height: 16),
-          _buildSelectableCardWithIcon(
-            text: "İkisi de",
-            subtext: "İki formata da açığım.",
-            icon: Icons.all_inclusive_rounded,
-            isSelected: _preferredLessonFormat == "İkisi de",
-            onTap: () => setState(() => _preferredLessonFormat = "İkisi de"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStep4Stats() {
-    return _buildStepContainer(
-      title: "Vücut Analizi",
-      subtitle: "Sana en uygun programı hazırlıyoruz.",
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Cinsiyet", style: GoogleFonts.poppins(color: Colors.white70)),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _buildGenderButton(
-                  "Erkek",
-                  Icons.male,
-                  () => setState(() => _gender = "Erkek"),
-                  _gender == "Erkek",
-                ),
-                const SizedBox(width: 15),
-                _buildGenderButton(
-                  "Kadın",
-                  Icons.female,
-                  () => setState(() => _gender = "Kadın"),
-                  _gender == "Kadın",
-                ),
-              ],
-            ),
-            const SizedBox(height: 25),
-            _buildStatInput("Yaş", _ageController),
-            const SizedBox(height: 15),
-            _buildStatInput("Boy (cm)", _heightController),
-            const SizedBox(height: 15),
-            _buildStatInput("Kilo (kg)", _weightController),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStep5Experience() {
-    return _buildStepContainer(
-      title: "Deneyim Seviyen",
-      subtitle: "Daha önce bu sporu yaptın mı?",
-      child: ListView.separated(
-        itemCount: _experienceLevels.length,
-        separatorBuilder: (c, i) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final level = _experienceLevels[index];
-          return _buildSelectableCard(
-            text: level,
-            isSelected: _experienceLevel == level,
-            onTap: () => setState(() => _experienceLevel = level),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildStep6Preferences() {
-    return _buildStepContainer(
-      title: "Zaman ve Tercih",
-      subtitle: "Seni en doğru hocayla eşleştirelim.",
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Antrenör Tercihi",
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _buildGenderButton(
-                  "Erkek",
-                  Icons.male,
-                  () => setState(() => _preferredCoachGender = "Erkek"),
-                  _preferredCoachGender == "Erkek",
-                ),
-                const SizedBox(width: 10),
-                _buildGenderButton(
-                  "Kadın",
-                  Icons.female,
-                  () => setState(() => _preferredCoachGender = "Kadın"),
-                  _preferredCoachGender == "Kadın",
-                ),
-                const SizedBox(width: 10),
-                _buildGenderButton(
-                  "Farketmez",
-                  Icons.people_outline,
-                  () => setState(() => _preferredCoachGender = "Farketmez"),
-                  _preferredCoachGender == "Farketmez",
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Müsait Günlerin",
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _daysList
-                  .map(
-                    (day) => ChoiceChip(
-                      label: Text(day),
-                      selected: _selectedDays.contains(day),
-                      selectedColor: ColorConstants.primaryColor,
-                      backgroundColor: Colors.white10,
-                      onSelected: (val) => setState(
-                        () => val
-                            ? _selectedDays.add(day)
-                            : _selectedDays.remove(day),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              "Müsait Saatlerin",
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _hoursList
-                  .map(
-                    (hour) => ChoiceChip(
-                      label: Text(hour),
-                      selected: _selectedHours.contains(hour),
-                      selectedColor: ColorConstants.primaryColor,
-                      backgroundColor: Colors.white10,
-                      onSelected: (val) => setState(
-                        () => val
-                            ? _selectedHours.add(hour)
-                            : _selectedHours.remove(hour),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -655,12 +389,292 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: isSelected
-                    ? Colors.black
-                    : const Color.fromARGB(255, 0, 0, 0),
+                color: isSelected ? Colors.black : Colors.white,
               ),
             ),
             if (isSelected) const Icon(Icons.check_circle, color: Colors.black),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep1Goal() {
+    return _buildStepContainer(
+      title: "Hedefin Ne?",
+      subtitle: "Seni motive eden asıl sebep nedir?",
+      child: ListView.separated(
+        itemCount: _goals.length,
+        separatorBuilder: (c, i) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final goal = _goals[index];
+          return _buildSelectableCard(
+            text: goal,
+            isSelected: _selectedGoal == goal,
+            onTap: () => setState(() => _selectedGoal = goal),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStep2Sports() {
+    return _buildStepContainer(
+      title: "İlgi Alanların",
+      subtitle: "Hangi branşlarla ilgileniyorsun?",
+      child: SingleChildScrollView(
+        child: Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _sports.map((sport) {
+            final isSelected = _selectedSports.contains(sport);
+            return ChoiceChip(
+              label: Text(sport),
+              selected: isSelected,
+              selectedColor: ColorConstants.primaryColor,
+              backgroundColor: Colors.white10,
+              labelStyle: GoogleFonts.poppins(
+                color: Colors.black,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              onSelected: (selected) {
+                setState(() {
+                  selected
+                      ? _selectedSports.add(sport)
+                      : _selectedSports.remove(sport);
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep3CoachingType() {
+    return _buildStepContainer(
+      title: "Nasıl Çalışmak İstersin?",
+      subtitle: "Sana en uygun antrenörleri buna göre listeleyeceğiz.",
+      child: Column(
+        children: [
+          _buildSelectableCardWithIcon(
+            text: "Online Koçluk",
+            subtext: "Uzaktan takip, program ve analiz.",
+            icon: Icons.wifi,
+            isSelected: _coachingType == "Online Koçluk",
+            onTap: () => setState(() => _coachingType = "Online Koçluk"),
+          ),
+          const SizedBox(height: 16),
+          _buildSelectableCardWithIcon(
+            text: "Birebir (Yüzyüze)",
+            subtext: "Spor salonunda veya dışarıda buluşarak.",
+            icon: Icons.people_alt_outlined,
+            isSelected: _coachingType == "Birebir (Yüzyüze)",
+            onTap: () => setState(() => _coachingType = "Birebir (Yüzyüze)"),
+          ),
+          const SizedBox(height: 16),
+          _buildSelectableCardWithIcon(
+            text: "Farketmez",
+            subtext: "Hem online hem yüzyüze.",
+            icon: Icons.compare_arrows_rounded,
+            isSelected: _coachingType == "Farketmez",
+            onTap: () => setState(() => _coachingType = "Farketmez"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep4LessonFormat() {
+    return _buildStepContainer(
+      title: "Ders Formatı",
+      subtitle: "Eğitimlerini nasıl almak istiyorsun?",
+      child: Column(
+        children: [
+          _buildSelectableCardWithIcon(
+            text: "Özel Ders",
+            subtext: "Eğitmen ile birebir.",
+            icon: Icons.person,
+            isSelected: _preferredLessonFormat == "Özel Ders",
+            onTap: () => setState(() => _preferredLessonFormat = "Özel Ders"),
+          ),
+          const SizedBox(height: 16),
+          _buildSelectableCardWithIcon(
+            text: "Grup Dersi",
+            subtext: "Küçük gruplar.",
+            icon: Icons.groups,
+            isSelected: _preferredLessonFormat == "Grup Dersi",
+            onTap: () => setState(() => _preferredLessonFormat = "Grup Dersi"),
+          ),
+          const SizedBox(height: 16),
+          _buildSelectableCardWithIcon(
+            text: "İkisi de",
+            subtext: "İki formata da açığım.",
+            icon: Icons.all_inclusive_rounded,
+            isSelected: _preferredLessonFormat == "İkisi de",
+            onTap: () => setState(() => _preferredLessonFormat = "İkisi de"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep5Stats() {
+    return _buildStepContainer(
+      title: "Vücut Analizi",
+      subtitle: "Sana en uygun programı hazırlıyoruz.",
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Cinsiyet", style: GoogleFonts.poppins(color: Colors.white70)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _buildGenderButton(
+                  "Erkek",
+                  Icons.male,
+                  () => setState(() => _gender = "Erkek"),
+                  _gender == "Erkek",
+                ),
+                const SizedBox(width: 15),
+                _buildGenderButton(
+                  "Kadın",
+                  Icons.female,
+                  () => setState(() => _gender = "Kadın"),
+                  _gender == "Kadın",
+                ),
+              ],
+            ),
+            const SizedBox(height: 25),
+            _buildStatInput("Yaş", _ageController),
+            const SizedBox(height: 15),
+            _buildStatInput("Boy (cm)", _heightController),
+            const SizedBox(height: 15),
+            _buildStatInput("Kilo (kg)", _weightController),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep6Experience() {
+    return _buildStepContainer(
+      title: "Deneyim Seviyen",
+      subtitle: "Daha önce bu sporu yaptın mı?",
+      child: ListView.separated(
+        itemCount: _experienceLevels.length,
+        separatorBuilder: (c, i) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final level = _experienceLevels[index];
+          return _buildSelectableCard(
+            text: level,
+            isSelected: _experienceLevel == level,
+            onTap: () => setState(() => _experienceLevel = level),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStep7Preferences() {
+    return _buildStepContainer(
+      title: "Zaman ve Tercih",
+      subtitle: "Seni en doğru hocayla eşleştirelim.",
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Antrenör Tercihi",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _buildGenderButton(
+                  "Erkek",
+                  Icons.male,
+                  () => setState(() => _preferredCoachGender = "Erkek"),
+                  _preferredCoachGender == "Erkek",
+                ),
+                const SizedBox(width: 10),
+                _buildGenderButton(
+                  "Kadın",
+                  Icons.female,
+                  () => setState(() => _preferredCoachGender = "Kadın"),
+                  _preferredCoachGender == "Kadın",
+                ),
+                const SizedBox(width: 10),
+                _buildGenderButton(
+                  "Farketmez",
+                  Icons.people_outline,
+                  () => setState(() => _preferredCoachGender = "Farketmez"),
+                  _preferredCoachGender == "Farketmez",
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "Müsait Günlerin",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _daysList
+                  .map(
+                    (day) => ChoiceChip(
+                      label: Text(day),
+                      selected: _selectedDays.contains(day),
+                      selectedColor: ColorConstants.primaryColor,
+                      backgroundColor: Colors.white10,
+                      labelStyle: const TextStyle(color: Colors.black),
+                      onSelected: (val) => setState(
+                        () => val
+                            ? _selectedDays.add(day)
+                            : _selectedDays.remove(day),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "Müsait Saatlerin",
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _hoursList
+                  .map(
+                    (hour) => ChoiceChip(
+                      label: Text(hour),
+                      selected: _selectedHours.contains(hour),
+                      selectedColor: ColorConstants.primaryColor,
+                      backgroundColor: Colors.white10,
+                      labelStyle: const TextStyle(color: Colors.black),
+                      onSelected: (val) => setState(
+                        () => val
+                            ? _selectedHours.add(hour)
+                            : _selectedHours.remove(hour),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
           ],
         ),
       ),
@@ -709,14 +723,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: isSelected ? Colors.black : Colors.white,
                     ),
                   ),
                   Text(
                     subtext,
                     style: GoogleFonts.poppins(
                       fontSize: 12,
-                      color: Colors.black87,
+                      color: isSelected ? Colors.black87 : Colors.white54,
                     ),
                   ),
                 ],
@@ -747,12 +761,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           child: Column(
             children: [
-              Icon(icon, color: Colors.black, size: 28),
+              Icon(
+                icon,
+                color: isSelected ? Colors.black : Colors.white,
+                size: 28,
+              ),
               const SizedBox(height: 8),
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  color: Colors.black,
+                  color: isSelected ? Colors.black : Colors.white,
                   fontWeight: FontWeight.w600,
                 ),
               ),

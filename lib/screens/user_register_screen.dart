@@ -13,6 +13,7 @@
 // ignore_for_file: deprecated_member_use
 
 library;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/color_constants.dart';
@@ -130,8 +131,8 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => widget.userType == 'coach'
-              ? const CoachOnboardingScreen()
-              : const OnboardingScreen(),
+              ? CoachOnboardingScreen() // const kaldırıldı
+              : OnboardingScreen(), // const kaldırıldı
         ),
       );
     } else {
@@ -152,8 +153,9 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
 
     // Provide the role so AuthService can create the Firestore document for a
     // brand-new Google account.
-    final String? error =
-        await _authService.signInWithGoogle(role: widget.userType);
+    final String? error = await _authService.signInWithGoogle(
+      role: widget.userType,
+    );
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -163,8 +165,8 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
         context,
         MaterialPageRoute(
           builder: (_) => widget.userType == 'coach'
-              ? const CoachOnboardingScreen()
-              : const OnboardingScreen(),
+              ? CoachOnboardingScreen() // const kaldırıldı
+              : OnboardingScreen(), // const kaldırıldı
         ),
       );
     } else {
@@ -267,8 +269,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
                               label: "Ad",
                               icon: Icons.person_outline,
                               controller: _nameController,
-                              validator: (val) =>
-                                  val!.isEmpty ? '' : null,
+                              validator: (val) => val!.isEmpty ? '' : null,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -277,8 +278,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
                               label: "Soyad",
                               icon: Icons.person_outline,
                               controller: _surnameController,
-                              validator: (val) =>
-                                  val!.isEmpty ? '' : null,
+                              validator: (val) => val!.isEmpty ? '' : null,
                             ),
                           ),
                         ],
@@ -344,11 +344,9 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
                       // Divider
                       Row(
                         children: [
-                          const Expanded(
-                              child: Divider(color: Colors.white24)),
+                          const Expanded(child: Divider(color: Colors.white24)),
                           Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
                             child: Text(
                               "veya şununla devam et",
                               style: GoogleFonts.poppins(
@@ -357,8 +355,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen> {
                               ),
                             ),
                           ),
-                          const Expanded(
-                              child: Divider(color: Colors.white24)),
+                          const Expanded(child: Divider(color: Colors.white24)),
                         ],
                       ),
 

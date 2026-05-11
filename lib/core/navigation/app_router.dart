@@ -1,19 +1,8 @@
 /// lib/core/navigation/app_router.dart
 ///
 /// Central routing helper for the application.
-///
-/// **Why this file exists:**
-/// The logic "after a successful login, check the user's role and onboarding
-/// state, then push the correct screen" was copy-pasted verbatim in three
-/// different places:
-///   - `LoginScreen._login()`
-///   - `LoginScreen._loginWithGoogle()`
-///   - `UserRegisterScreen._registerWithGoogle()`
-///
-/// Any change to the routing rules had to be made in all three spots — a
-/// classic Open/Closed violation. [AppRouter] is the single source of truth.
-
 library;
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../screens/home_screen.dart';
@@ -34,21 +23,10 @@ class AppRouter {
 
   /// Determines the correct destination screen after a successful sign-in or
   /// registration, then navigates to it by clearing the entire back stack.
-  ///
-  /// Decision logic:
-  ///   1. Fetch the user's [onboarding status] and [role] from [authService].
-  ///   2. If onboarding is complete → go to the appropriate home screen.
-  ///   3. If onboarding is not complete → go to the appropriate onboarding screen.
-  ///
-  /// [context] must still be mounted when this method is called.
-  /// Returns early without navigating if the widget is unmounted.
   static Future<void> navigateAfterAuth(
     BuildContext context,
     IAuthService authService,
   ) async {
-    // Guard: do nothing if the widget that triggered auth is gone.
-    if (!context.mounted) return;
-
     final String uid = FirebaseAuth.instance.currentUser!.uid;
 
     // Parallel fetch — both are independent Firestore reads.
@@ -67,8 +45,8 @@ class AppRouter {
     if (isOnboarded) {
       destination = isCoach ? const CoachHomeScreen() : const HomeScreen();
     } else {
-      destination =
-          isCoach ? const CoachOnboardingScreen() : const OnboardingScreen();
+      // 'const' ifadeleri kaldırıldı çünkü Onboarding sınıfları artık servis bağımlılığı alıyor.
+      destination = isCoach ? CoachOnboardingScreen() : OnboardingScreen();
     }
 
     // Replace the entire navigation stack so the user cannot press Back
@@ -85,9 +63,6 @@ class AppRouter {
   // ---------------------------------------------------------------------------
 
   /// Navigates to [WelcomeScreen], clearing the back stack.
-  ///
-  /// Used by the Settings tab "Logout" action so the user cannot navigate
-  /// back to a protected screen after signing out.
   static void goToWelcome(BuildContext context) {
     Navigator.pushAndRemoveUntil(
       context,

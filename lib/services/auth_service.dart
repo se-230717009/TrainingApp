@@ -12,6 +12,7 @@
 /// directly, to honour the Dependency Inversion Principle.
 
 library;
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -44,9 +45,9 @@ class AuthService implements IAuthService {
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     GoogleSignIn? googleSignIn,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _firestore = firestore ?? FirebaseFirestore.instance,
-        _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _firestore = firestore ?? FirebaseFirestore.instance,
+       _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
 
   // ---------------------------------------------------------------------------
   // Private helpers
@@ -98,21 +99,23 @@ class AuthService implements IAuthService {
 
       // Trigger the Google authentication flow.
       final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
-      final GoogleSignInAuthentication googleAuth =
-          googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
       // Build a Firebase credential from the Google ID token.
       final AuthCredential credential = GoogleAuthProvider.credential(
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential =
-          await _auth.signInWithCredential(credential);
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
       final String uid = userCredential.user!.uid;
 
       // Check whether this account already exists in Firestore.
-      final DocumentSnapshot doc =
-          await _firestore.collection('users').doc(uid).get();
+      final DocumentSnapshot doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
 
       if (!doc.exists) {
         // --- New user ---
@@ -155,11 +158,8 @@ class AuthService implements IAuthService {
   }) async {
     try {
       // 1. Create the Firebase Auth account.
-      final UserCredential userCredential =
-          await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
 
       // 2. Persist the full profile to Firestore.
       await _createUserDocument(
@@ -202,8 +202,10 @@ class AuthService implements IAuthService {
   @override
   Future<bool> checkOnboardingStatus(String uid) async {
     try {
-      final DocumentSnapshot doc =
-          await _firestore.collection('users').doc(uid).get();
+      final DocumentSnapshot doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
         return data['isOnboardingCompleted'] == true;
@@ -217,8 +219,10 @@ class AuthService implements IAuthService {
   @override
   Future<String?> getUserType(String uid) async {
     try {
-      final DocumentSnapshot doc =
-          await _firestore.collection('users').doc(uid).get();
+      final DocumentSnapshot doc = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
         return data['userType'] as String?;
