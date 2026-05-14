@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -47,26 +49,29 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
         .where('status', isEqualTo: 'approved')
         .snapshots()
         .listen((snap) {
-          if (mounted)
+          if (mounted) {
             setState(() => _lessons = snap.docs.map((d) => d.data()).toList());
+          }
         });
     _activitiesSub = FirebaseFirestore.instance
         .collection('coach_manual_activities')
         .where('coachId', isEqualTo: uid)
         .snapshots()
         .listen((snap) {
-          if (mounted)
+          if (mounted) {
             setState(
               () => _activities = snap.docs.map((d) => d.data()).toList(),
             );
+          }
         });
     _routinesSub = FirebaseFirestore.instance
         .collection('coach_routines')
         .where('coachId', isEqualTo: uid)
         .snapshots()
         .listen((snap) {
-          if (mounted)
+          if (mounted) {
             setState(() => _routines = snap.docs.map((d) => d.data()).toList());
+          }
         });
   }
 
@@ -233,8 +238,9 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                         children: events.map((event) {
                           Color dotColor = Colors.orange;
                           if (event == 'busy') dotColor = Colors.redAccent;
-                          if (event == 'lesson')
+                          if (event == 'lesson') {
                             dotColor = ColorConstants.primaryColor;
+                          }
                           return Container(
                             margin: const EdgeInsets.symmetric(horizontal: 1.5),
                             width: 6,
@@ -381,12 +387,13 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
         .where('days', arrayContains: dayName)
         .snapshots()
         .listen((snap) {
-          if (mounted)
+          if (mounted) {
             setState(
               () => _lessons = snap.docs
                   .map((d) => <String, dynamic>{...d.data(), 'id': d.id})
                   .toList(),
             );
+          }
         });
     _activitiesSub = FirebaseFirestore.instance
         .collection('coach_manual_activities')
@@ -394,12 +401,13 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
         .where('date', isEqualTo: dateStr)
         .snapshots()
         .listen((snap) {
-          if (mounted)
+          if (mounted) {
             setState(
               () => _activities = snap.docs
                   .map((d) => <String, dynamic>{...d.data(), 'id': d.id})
                   .toList(),
             );
+          }
         });
     _routinesSub = FirebaseFirestore.instance
         .collection('coach_routines')
@@ -407,12 +415,13 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
         .where('days', arrayContains: dayName)
         .snapshots()
         .listen((snap) {
-          if (mounted)
+          if (mounted) {
             setState(
               () => _routines = snap.docs
                   .map((d) => <String, dynamic>{...d.data(), 'id': d.id})
                   .toList(),
             );
+          }
         });
   }
 
@@ -449,12 +458,14 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
     List<Map<String, dynamic>> events = [];
     String hourStr = hour.toString().padLeft(2, '0');
     for (var act in _activities) {
-      if (act['hour'] != null && act['hour'].toString().startsWith(hourStr))
+      if (act['hour'] != null && act['hour'].toString().startsWith(hourStr)) {
         events.add({...act, 'type': 'activity'});
+      }
     }
     for (var r in _routines) {
-      if (r['hour'] != null && r['hour'].toString().startsWith(hourStr))
+      if (r['hour'] != null && r['hour'].toString().startsWith(hourStr)) {
         events.add({...r, 'type': 'routine'});
+      }
     }
     for (var l in _lessons) {
       List<dynamic> hours = l['hours'] ?? [];
@@ -940,9 +951,14 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                             label: Text(day.substring(0, 3)),
                             selected: isSelected,
                             selectedColor: Colors.blueAccent,
-                            backgroundColor: Colors.white10,
+                            backgroundColor: const Color.fromARGB(
+                              255,
+                              255,
+                              255,
+                              255,
+                            ),
                             labelStyle: GoogleFonts.poppins(
-                              color: isSelected ? Colors.white : Colors.white70,
+                              color: Colors.black,
                             ),
                             onSelected: (val) => setModalState(() {
                               val
@@ -986,8 +1002,9 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                                     child: child!,
                                   ),
                                 );
-                                if (picked != null)
+                                if (picked != null) {
                                   setModalState(() => endDate = picked);
+                                }
                               },
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -1192,8 +1209,9 @@ class _CoachDayDetailsScreenState extends State<CoachDayDetailsScreen> {
                                     ),
                                   );
                                 } finally {
-                                  if (mounted)
+                                  if (mounted) {
                                     setModalState(() => isSubmitting = false);
+                                  }
                                 }
                               },
                         style: ElevatedButton.styleFrom(

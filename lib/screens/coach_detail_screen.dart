@@ -12,6 +12,7 @@ import '../widgets/gradient_background.dart';
 import 'chat_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'welcome_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 void showGuestRegistrationPopup(BuildContext context) {
   showDialog(
@@ -198,7 +199,9 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                       backgroundColor: Colors.white10,
                                       backgroundImage:
                                           review['userImage'] != null
-                                          ? NetworkImage(review['userImage'])
+                                          ? CachedNetworkImageProvider(
+                                              review['userImage'],
+                                            )
                                           : null,
                                       child: review['userImage'] == null
                                           ? const Icon(
@@ -306,7 +309,9 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                       color: Colors.white10,
                       image: profileImageUrl != null
                           ? DecorationImage(
-                              image: NetworkImage(profileImageUrl),
+                              image: CachedNetworkImageProvider(
+                                profileImageUrl,
+                              ),
                               fit: BoxFit.cover,
                             )
                           : null,

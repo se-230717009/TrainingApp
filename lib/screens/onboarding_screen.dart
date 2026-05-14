@@ -389,7 +389,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.black : Colors.white,
+                color: Colors.black,
               ),
             ),
             if (isSelected) const Icon(Icons.check_circle, color: Colors.black),
@@ -707,11 +707,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     : Colors.black26,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                color: isSelected ? Colors.black : Colors.white,
-                size: 24,
-              ),
+              child: Icon(icon, color: Colors.black, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -723,7 +719,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.black : Colors.white,
+                      color: Colors.black,
                     ),
                   ),
                   Text(
@@ -761,16 +757,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           child: Column(
             children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.black : Colors.white,
-                size: 28,
-              ),
+              Icon(icon, color: Colors.black, size: 28),
               const SizedBox(height: 8),
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  color: isSelected ? Colors.black : Colors.white,
+                  color: Colors.black,
                   fontWeight: FontWeight.w600,
                 ),
               ),

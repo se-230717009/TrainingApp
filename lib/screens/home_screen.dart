@@ -28,6 +28,7 @@ import 'athlete_messages_screen.dart'; // YENİ EKLENDİ
 import 'athlete_notifications_screen.dart';
 import '../widgets/settings_menu_item.dart';
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -760,12 +761,14 @@ class _HomeScreenState extends State<HomeScreen> {
               Icon(icon, size: 16, color: Colors.black),
               const SizedBox(width: 4),
             ],
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                color: Colors.black,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                fontSize: 13,
+            Flexible(
+              child: Text(
+                label,
+                style: GoogleFonts.poppins(
+                  color: Colors.black,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 13,
+                ),
               ),
             ),
           ],
@@ -833,7 +836,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   radius: 24,
                   backgroundColor: Colors.white10,
                   backgroundImage: profileImageUrl != null
-                      ? NetworkImage(profileImageUrl)
+                      ? CachedNetworkImageProvider(profileImageUrl)
                       : null,
                   child: profileImageUrl == null
                       ? const Icon(Icons.person, color: Colors.white38)

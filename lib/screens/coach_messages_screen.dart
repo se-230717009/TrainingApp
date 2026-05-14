@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/gradient_background.dart';
 import 'chat_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class CoachMessagesScreen extends StatefulWidget {
   const CoachMessagesScreen({super.key});
@@ -153,7 +154,7 @@ class _CoachMessagesScreenState extends State<CoachMessagesScreen> {
                           radius: 26,
                           backgroundColor: Colors.white10,
                           backgroundImage: profileImageUrl != null
-                              ? NetworkImage(profileImageUrl)
+                              ? CachedNetworkImageProvider(profileImageUrl)
                               : null,
                           child: profileImageUrl == null
                               ? const Icon(Icons.person, color: Colors.white38)

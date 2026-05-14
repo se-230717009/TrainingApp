@@ -4,6 +4,7 @@
 /// `chat_rooms` collection filtered to rooms where the current user
 /// is a participant. Tapping a room opens [ChatScreen].
 library;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,6 +12,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants/color_constants.dart';
 import '../widgets/gradient_background.dart';
 import 'chat_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// Athlete's messages inbox — shows all active chat rooms.
 class AthleteMessagesScreen extends StatefulWidget {
@@ -160,7 +162,7 @@ class _AthleteMessagesScreenState extends State<AthleteMessagesScreen> {
                           radius: 26,
                           backgroundColor: Colors.white10,
                           backgroundImage: profileImageUrl != null
-                              ? NetworkImage(profileImageUrl)
+                              ? CachedNetworkImageProvider(profileImageUrl)
                               : null,
                           child: profileImageUrl == null
                               ? const Icon(Icons.person, color: Colors.white38)

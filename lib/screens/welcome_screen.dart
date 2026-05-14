@@ -5,6 +5,7 @@
 ///   - "Log In"  → navigates to [LoginScreen].
 ///   - "Create Account" → navigates to [RoleSelectionScreen].
 library;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/constants/color_constants.dart';
@@ -24,8 +25,8 @@ class WelcomeScreen extends StatelessWidget {
         children: [
           // KATMAN 1: ARKA PLAN GÖRSELİ
           Positioned.fill(
-            child: Image.network(
-              'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?q=80&w=1920&auto=format&fit=crop',
+            child: Image.asset(
+              'assets/images/welcome.jpg',
               fit: BoxFit.cover, // Resmi ekrana yayar, keserek doldurur
             ),
           ),

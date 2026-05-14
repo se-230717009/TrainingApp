@@ -1,4 +1,4 @@
-// ignore_for_file: unused_field, deprecated_member_use
+// ignore_for_file: unused_field, deprecated_member_use, dangling_library_doc_comments
 
 /// lib/screens/edit_profile_screen.dart
 ///
@@ -23,6 +23,8 @@ import '../widgets/custom_button.dart';
 import '../widgets/scale_button.dart';
 import '../widgets/gradient_background.dart';
 import 'welcome_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
 
 /// Profile editing screen — supports both athlete and coach profiles.
 class EditProfileScreen extends StatefulWidget {
@@ -34,6 +36,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   /// The current user's UID — nullable so guests don't crash the app.
+  final ImagePicker _picker = ImagePicker();
   final String? _uid = FirebaseAuth.instance.currentUser?.uid;
   bool _isLoading = true;
   bool _isSaving = false;
@@ -50,6 +53,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _ageController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
+
   List<String> _selectedSports = [];
   String? _selectedLevel;
   String? _selectedGoal;
@@ -295,6 +299,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       _showError("Fotoğraf seçilemedi: $e");
     }
+
+    await _picker.pickImage(source: ImageSource.gallery, imageQuality: 25);
   }
 
   Future<void> _saveProfile() async {
@@ -406,7 +412,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.pop(context);
       }
     } catch (e) {
       _showError("Profil kaydedilirken bir hata oluştu: $e");
@@ -777,7 +782,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             backgroundImage: _selectedImage != null
                                 ? FileImage(_selectedImage!) as ImageProvider
                                 : (_profileImageUrl != null
-                                      ? NetworkImage(_profileImageUrl!)
+                                      ? CachedNetworkImageProvider(
+                                          _profileImageUrl!,
+                                        )
                                       : null),
                             child:
                                 (_selectedImage == null &&
@@ -992,22 +999,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           format,
                         ) {
                           final isSelected = _lessonFormat == format;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: ChoiceChip(
-                              label: Text(format),
-                              labelStyle: GoogleFonts.poppins(
-                                color: Colors.black,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
+                          return Flexible(
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ChoiceChip(
+                                label: Text(format),
+                                labelStyle: GoogleFonts.poppins(
+                                  color: Colors.black,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                                selected: isSelected,
+                                selectedColor: ColorConstants.primaryColor,
+                                backgroundColor: Colors.white10,
+                                onSelected: (val) {
+                                  if (val)
+                                    setState(() => _lessonFormat = format);
+                                },
                               ),
-                              selected: isSelected,
-                              selectedColor: ColorConstants.primaryColor,
-                              backgroundColor: Colors.white10,
-                              onSelected: (val) {
-                                if (val) setState(() => _lessonFormat = format);
-                              },
                             ),
                           );
                         }).toList(),

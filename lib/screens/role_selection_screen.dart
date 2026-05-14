@@ -4,6 +4,7 @@
 /// Tapping a role card navigates to [UserRegisterScreen] with the
 /// selected [userType] (`'coach'` or `'athlete'`).
 library;
+
 import 'package:coachingapp/screens/user_register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -25,8 +26,8 @@ class RoleSelectionScreen extends StatelessWidget {
         children: [
           // 1. ARKA PLAN GÖRSELİ
           Positioned.fill(
-            child: Image.network(
-              'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1920&auto=format&fit=crop',
+            child: Image.asset(
+              'assets/images/role_selection.jpg',
               fit: BoxFit.cover,
             ),
           ),

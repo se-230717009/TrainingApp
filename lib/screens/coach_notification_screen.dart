@@ -8,6 +8,7 @@
 /// directly (Single Responsibility Principle).
 
 library;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,6 +18,7 @@ import '../services/lesson_service.dart';
 import '../services/notification_service.dart';
 import '../services/interfaces/i_lesson_service.dart';
 import '../services/interfaces/i_notification_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// Coach-facing screen that lists unanswered lesson booking requests.
 class CoachNotificationsScreen extends StatefulWidget {
@@ -30,9 +32,9 @@ class CoachNotificationsScreen extends StatefulWidget {
     super.key,
     ILessonService? lessonService,
     INotificationService? notificationService,
-  })  : lessonService = lessonService ?? const _DefaultLesson(),
-        notificationService =
-            notificationService ?? const _DefaultNotification();
+  }) : lessonService = lessonService ?? const _DefaultLesson(),
+       notificationService =
+           notificationService ?? const _DefaultNotification();
 
   @override
   State<CoachNotificationsScreen> createState() =>
@@ -51,8 +53,7 @@ class _DefaultNotification implements INotificationService {
   dynamic noSuchMethod(Invocation i) => NotificationService();
 }
 
-class _CoachNotificationsScreenState
-    extends State<CoachNotificationsScreen> {
+class _CoachNotificationsScreenState extends State<CoachNotificationsScreen> {
   // ---------------------------------------------------------------------------
   // Dependencies
   // ---------------------------------------------------------------------------
@@ -153,10 +154,10 @@ class _CoachNotificationsScreenState
               // Safely read the first day/hour from list fields.
               final String lessonDay =
                   (lessonData['days'] as List?)?.first as String? ??
-                      'Gün belirtilmedi';
+                  'Gün belirtilmedi';
               final String lessonHour =
                   (lessonData['hours'] as List?)?.first as String? ??
-                      'Saat belirtilmedi';
+                  'Saat belirtilmedi';
 
               return _buildRequestCard(
                 doc.id,
@@ -190,10 +191,7 @@ class _CoachNotificationsScreenState
           const SizedBox(height: 16),
           Text(
             "Yeni bildiriminiz yok.",
-            style: GoogleFonts.poppins(
-              color: Colors.white54,
-              fontSize: 16,
-            ),
+            style: GoogleFonts.poppins(color: Colors.white54, fontSize: 16),
           ),
         ],
       ),
@@ -229,7 +227,9 @@ class _CoachNotificationsScreenState
                 radius: 20,
                 backgroundColor: Colors.white10,
                 backgroundImage: lessonData['athleteImage'] != null
-                    ? NetworkImage(lessonData['athleteImage'] as String)
+                    ? CachedNetworkImageProvider(
+                        lessonData['athleteImage'] as String,
+                      )
                     : null,
                 child: lessonData['athleteImage'] == null
                     ? const Icon(Icons.person, color: Colors.white38)
@@ -241,8 +241,7 @@ class _CoachNotificationsScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      lessonData['athleteName'] as String? ??
-                          'İsimsiz Öğrenci',
+                      lessonData['athleteName'] as String? ?? 'İsimsiz Öğrenci',
                       style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -268,8 +267,7 @@ class _CoachNotificationsScreenState
           // Lesson day/time
           _infoRow(Icons.event, "$lessonDay • $lessonHour"),
           const SizedBox(height: 6),
-          _infoRow(Icons.sports_gymnastics,
-              "${lessonData['sport']} Dersi"),
+          _infoRow(Icons.sports_gymnastics, "${lessonData['sport']} Dersi"),
 
           const SizedBox(height: 16),
 

@@ -252,25 +252,32 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   void _nextPage() {
     final int totalPages = _pages.length;
 
-    if (_currentIndex == 0 && !_isEmailVerified)
+    if (_currentIndex == 0 && !_isEmailVerified) {
       return _showError("Lütfen devam etmeden önce e-postanızı onaylayın.");
+    }
     if (_currentIndex == 1 &&
-        (_selectedSpecialties.isEmpty || _priceController.text.trim().isEmpty))
+        (_selectedSpecialties.isEmpty ||
+            _priceController.text.trim().isEmpty)) {
       return _showError(
         "Lütfen uzmanlık alanınızı ve saatlik ücretinizi girin.",
       );
+    }
     if (_currentIndex == 2 &&
         (_bioController.text.trim().isEmpty ||
-            _bioController.text.trim().length < 20))
+            _bioController.text.trim().length < 20)) {
       return _showError("Hakkında kısmı en az 20 karakter olmalıdır.");
+    }
     if (_currentIndex == 3 &&
         _referenceController.text.trim().isEmpty &&
-        _selectedFile == null)
+        _selectedFile == null) {
       return _showError("Lütfen bir referans linki girin veya belge yükleyin.");
-    if (_currentIndex == 4 && _deliveryMode == null)
+    }
+    if (_currentIndex == 4 && _deliveryMode == null) {
       return _showError("Lütfen çalışma şeklini seçin.");
-    if (_currentIndex == 5 && _lessonFormat == null)
+    }
+    if (_currentIndex == 5 && _lessonFormat == null) {
       return _showError("Lütfen verdiğiniz ders formatını seçin.");
+    }
 
     if (_needsLocation) {
       if (_currentIndex == 6 &&
@@ -278,19 +285,24 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
               _selectedDistrict == null ||
               _selectedNeighborhood == null ||
               _addressTitleController.text.isEmpty ||
-              _addressDetailController.text.isEmpty))
+              _addressDetailController.text.isEmpty)) {
         return _showError(
           "Lütfen il, ilçe ve adres bilgilerini eksiksiz doldurun.",
         );
-      if (_currentIndex == 7 && _dayHoursMap.isEmpty)
+      }
+      if (_currentIndex == 7 && _dayHoursMap.isEmpty) {
         return _showError("Lütfen en az bir gün için saat aralığı belirleyin.");
-      if (_currentIndex == 8 && _coachCharacter == null)
+      }
+      if (_currentIndex == 8 && _coachCharacter == null) {
         return _showError("Lütfen eğitmen karakterinizi seçin.");
+      }
     } else {
-      if (_currentIndex == 6 && _dayHoursMap.isEmpty)
+      if (_currentIndex == 6 && _dayHoursMap.isEmpty) {
         return _showError("Lütfen en az bir gün için saat aralığı belirleyin.");
-      if (_currentIndex == 7 && _coachCharacter == null)
+      }
+      if (_currentIndex == 7 && _coachCharacter == null) {
         return _showError("Lütfen eğitmen karakterinizi seçin.");
+      }
     }
 
     if (_currentIndex < totalPages - 1) {
@@ -627,27 +639,29 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
             style: GoogleFonts.poppins(color: Colors.white70),
           ),
           const SizedBox(height: 10),
-          ScaleButton(
-            onPressed: _pickFile,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              decoration: BoxDecoration(
-                color: Colors.white10,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: _selectedFile != null
-                      ? ColorConstants.primaryColor
-                      : Colors.white24,
+          Flexible(
+            child: ScaleButton(
+              onPressed: _pickFile,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _selectedFile != null
+                        ? ColorConstants.primaryColor
+                        : Colors.white24,
+                  ),
                 ),
-              ),
-              child: Text(
-                _selectedFile != null ? _fileName! : "Sertifika Seç",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  color: _selectedFile != null
-                      ? ColorConstants.primaryColor
-                      : Colors.white70,
+                child: Text(
+                  _selectedFile != null ? _fileName! : "Sertifika Seç",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    color: _selectedFile != null
+                        ? ColorConstants.primaryColor
+                        : Colors.white70,
+                  ),
                 ),
               ),
             ),
@@ -712,7 +726,9 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
         decoration: BoxDecoration(
-          color: isSelected ? ColorConstants.primaryColor : Colors.white10,
+          color: isSelected
+              ? ColorConstants.primaryColor
+              : const Color.fromARGB(255, 255, 255, 255),
           borderRadius: BorderRadius.circular(16),
           border: isSelected
               ? Border.all(color: ColorConstants.primaryColor)
@@ -723,18 +739,14 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                color: isSelected ? Colors.black : Colors.white,
-                size: 24,
-              ),
+              Icon(icon, color: Colors.black, size: 24),
               const SizedBox(height: 8),
               Text(
                 label,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.poppins(
                   fontSize: 12,
-                  color: isSelected ? Colors.black : Colors.white,
+                  color: Colors.black,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 ),
               ),
@@ -1031,7 +1043,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
               decoration: BoxDecoration(
                 color: isSelected
                     ? ColorConstants.primaryColor
-                    : Colors.white10,
+                    : const Color.fromARGB(255, 255, 255, 255),
                 borderRadius: BorderRadius.circular(16),
                 border: isSelected
                     ? Border.all(color: ColorConstants.primaryColor, width: 2)
@@ -1046,7 +1058,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: isSelected ? Colors.black : Colors.white,
+                        color: Colors.black,
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,

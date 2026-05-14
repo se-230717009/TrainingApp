@@ -25,6 +25,7 @@ import 'coach_calender_screen.dart';
 import 'coach_messages_screen.dart';
 import 'coach_notification_screen.dart';
 import '../widgets/settings_menu_item.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class CoachHomeScreen extends StatefulWidget {
   const CoachHomeScreen({super.key});
@@ -203,10 +204,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  height:
-                      MediaQuery.of(context).padding.top + kToolbarHeight + 16,
-                ),
+                SizedBox(height: MediaQuery.of(context).padding.top + 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Text(
@@ -331,7 +329,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                       radius: 30,
                       backgroundColor: Colors.white10,
                       backgroundImage: profileImageUrl != null
-                          ? NetworkImage(profileImageUrl)
+                          ? CachedNetworkImageProvider(profileImageUrl)
                           : null,
                       child: profileImageUrl == null
                           ? const Icon(
@@ -598,6 +596,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
       ),
     );
   }
-
 }
+
 // _buildMenuItem removed — use the shared SettingsMenuItem widget instead.

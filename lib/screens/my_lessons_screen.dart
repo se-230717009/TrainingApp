@@ -14,6 +14,7 @@
 // ignore_for_file: deprecated_member_use
 
 library;
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -25,16 +26,15 @@ import '../widgets/scale_button.dart';
 import '../widgets/gradient_background.dart';
 import 'video_call_screen.dart';
 import 'welcome_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// Athlete's lesson history and active lesson management screen.
 class MyLessonsScreen extends StatefulWidget {
   /// Injectable lesson service — defaults to [LessonService].
   final ILessonService lessonService;
 
-  const MyLessonsScreen({
-    super.key,
-    ILessonService? lessonService,
-  }) : lessonService = lessonService ?? const _DefaultLesson();
+  const MyLessonsScreen({super.key, ILessonService? lessonService})
+    : lessonService = lessonService ?? const _DefaultLesson();
 
   @override
   State<MyLessonsScreen> createState() => _MyLessonsScreenState();
@@ -135,8 +135,8 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                           color: Colors.amber,
                           size: 40,
                         ),
-                        onPressed: () => setModalState(
-                            () => selectedStar = index + 1),
+                        onPressed: () =>
+                            setModalState(() => selectedStar = index + 1),
                       );
                     }),
                   ),
@@ -149,8 +149,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                     style: GoogleFonts.poppins(color: Colors.white),
                     decoration: InputDecoration(
                       hintText: "Eğitmen hakkında ne düşünüyorsun?",
-                      hintStyle:
-                          GoogleFonts.poppins(color: Colors.white30),
+                      hintStyle: GoogleFonts.poppins(color: Colors.white30),
                       filled: true,
                       fillColor: Colors.black26,
                       border: OutlineInputBorder(
@@ -168,8 +167,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                       onPressed: isSubmitting
                           ? null
                           : () async {
-                              if (commentController.text.trim().isEmpty)
-                                return;
+                              if (commentController.text.trim().isEmpty) return;
                               setModalState(() => isSubmitting = true);
                               await _submitReview(
                                 coachId,
@@ -191,8 +189,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: ColorConstants.primaryColor,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),
@@ -228,8 +225,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
 
   /// Delegates review submission to [ILessonService] after fetching the
   /// current athlete's display name and avatar from Firestore.
-  Future<void> _submitReview(
-      String coachId, int rating, String comment) async {
+  Future<void> _submitReview(String coachId, int rating, String comment) async {
     final currentUser = _auth.currentUser!;
 
     // Fetch the athlete's own profile to denormalise their name into the review.
@@ -262,8 +258,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           "Emin misin?",
           style: GoogleFonts.poppins(
@@ -351,8 +346,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
           ),
         ),
         body: StreamBuilder<QuerySnapshot>(
-          stream: _lessonService
-              .getLessonsForAthlete(_auth.currentUser!.uid),
+          stream: _lessonService.getLessonsForAthlete(_auth.currentUser!.uid),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(
@@ -367,9 +361,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
 
             return ListView.builder(
               padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top +
-                    kToolbarHeight +
-                    16,
+                top: MediaQuery.of(context).padding.top + kToolbarHeight + 16,
                 left: 16,
                 right: 16,
                 bottom: 16,
@@ -377,8 +369,8 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
               itemCount: snapshot.data!.docs.length,
               itemBuilder: (context, index) {
                 final docId = snapshot.data!.docs[index].id;
-                final lesson = snapshot.data!.docs[index].data()
-                    as Map<String, dynamic>;
+                final lesson =
+                    snapshot.data!.docs[index].data() as Map<String, dynamic>;
                 return _buildLessonCard(docId, lesson);
               },
             );
@@ -441,13 +433,14 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
               ElevatedButton(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (_) => const WelcomeScreen()),
+                  MaterialPageRoute(builder: (_) => const WelcomeScreen()),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: ColorConstants.primaryColor,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 40, vertical: 16),
+                    horizontal: 40,
+                    vertical: 16,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -514,7 +507,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                 radius: 24,
                 backgroundColor: Colors.white10,
                 backgroundImage: lesson['coachImage'] != null
-                    ? NetworkImage(lesson['coachImage'] as String)
+                    ? CachedNetworkImageProvider(lesson['coachImage'] as String)
                     : null,
                 child: lesson['coachImage'] == null
                     ? const Icon(Icons.person, color: Colors.white54)
@@ -547,7 +540,9 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
               // Status badge
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
@@ -574,11 +569,15 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
           const SizedBox(height: 16),
 
           // Day and time rows
-          _detailRow(Icons.calendar_today_rounded,
-              (lesson['days'] as List? ?? []).join(', ')),
+          _detailRow(
+            Icons.calendar_today_rounded,
+            (lesson['days'] as List? ?? []).join(', '),
+          ),
           const SizedBox(height: 8),
-          _detailRow(Icons.access_time_rounded,
-              (lesson['hours'] as List? ?? []).join(', ')),
+          _detailRow(
+            Icons.access_time_rounded,
+            (lesson['hours'] as List? ?? []).join(', '),
+          ),
 
           // Online lesson: join button
           if (status == 'approved' && type == 'Online') ...[
@@ -596,8 +595,7 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                   ),
                 );
                 if (isClassEnded == true) {
-                  _showAddReviewModal(
-                      lesson['coachId'] as String);
+                  _showAddReviewModal(lesson['coachId'] as String);
                 }
               },
               child: Container(
@@ -605,16 +603,12 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [
-                      ColorConstants.primaryColor,
-                      Color(0xFFB4FF4E),
-                    ],
+                    colors: [ColorConstants.primaryColor, Color(0xFFB4FF4E)],
                   ),
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color:
-                          ColorConstants.primaryColor.withOpacity(0.3),
+                      color: ColorConstants.primaryColor.withOpacity(0.3),
                       blurRadius: 10,
                       spreadRadius: 1,
                     ),
@@ -623,8 +617,11 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.videocam_rounded,
-                        color: Colors.black, size: 20),
+                    const Icon(
+                      Icons.videocam_rounded,
+                      color: Colors.black,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       "Canlı Derse Katıl",
@@ -642,16 +639,18 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
           else if (status == 'approved' && type == 'Yüzyüze') ...[
             const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  vertical: 12, horizontal: 16),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.location_on_rounded,
-                      color: Colors.white54, size: 20),
+                  const Icon(
+                    Icons.location_on_rounded,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -679,15 +678,16 @@ class _MyLessonsScreenState extends State<MyLessonsScreen> {
                 decoration: BoxDecoration(
                   color: Colors.redAccent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.redAccent.withOpacity(0.5),
-                  ),
+                  border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.cancel_outlined,
-                        color: Colors.redAccent, size: 20),
+                    const Icon(
+                      Icons.cancel_outlined,
+                      color: Colors.redAccent,
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       "Dersi İptal Et",
