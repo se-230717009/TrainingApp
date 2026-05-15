@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -13,6 +15,49 @@ import 'chat_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'welcome_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+// --- YARDIMCI FONKSİYONLAR ---
+String getWeekdayString(int weekday) {
+  switch (weekday) {
+    case 1:
+      return "Pazartesi";
+    case 2:
+      return "Salı";
+    case 3:
+      return "Çarşamba";
+    case 4:
+      return "Perşembe";
+    case 5:
+      return "Cuma";
+    case 6:
+      return "Cumartesi";
+    case 7:
+      return "Pazar";
+    default:
+      return "";
+  }
+}
+
+bool isRoutineValidForDay(Map<String, dynamic> r, DateTime day) {
+  String dayName = getWeekdayString(day.weekday);
+  if (!(r['days'] as List? ?? []).contains(dayName)) return false;
+
+  DateTime dayDateOnly = DateTime(day.year, day.month, day.day);
+
+  if (r['startDate'] != null) {
+    DateTime start = DateFormat('yyyy-MM-dd').parse(r['startDate']);
+    DateTime startDateOnly = DateTime(start.year, start.month, start.day);
+    if (dayDateOnly.isBefore(startDateOnly)) return false;
+  }
+
+  if (r['endDate'] != null) {
+    DateTime end = DateFormat('yyyy-MM-dd').parse(r['endDate']);
+    DateTime endDateOnly = DateTime(end.year, end.month, end.day);
+    if (dayDateOnly.isAfter(endDateOnly)) return false;
+  }
+
+  return true;
+}
 
 void showGuestRegistrationPopup(BuildContext context) {
   showDialog(
@@ -156,21 +201,20 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                         .orderBy('timestamp', descending: true)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
+                      if (snapshot.connectionState == ConnectionState.waiting)
                         return const Center(
                           child: CircularProgressIndicator(
                             color: ColorConstants.primaryColor,
                           ),
                         );
-                      }
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
                         return Center(
                           child: Text(
                             "Henüz yorum yapılmamış.",
                             style: GoogleFonts.poppins(color: Colors.white54),
                           ),
                         );
-                      }
+
                       return ListView.builder(
                         controller: scrollController,
                         padding: const EdgeInsets.symmetric(
@@ -360,26 +404,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                       ),
                     ),
                   ),
-                  Positioned(
-                    top: 50,
-                    right: 20,
-                    child: ScaleButton(
-                      onPressed: () {},
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.black26,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white12),
-                        ),
-                        child: const Icon(
-                          Icons.favorite_border_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
               Padding(
@@ -425,10 +449,10 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                               ),
                             ),
                             Text(
-                              "Saatlik",
+                              "Saatlik Ortalama",
                               style: GoogleFonts.poppins(
                                 color: Colors.white54,
-                                fontSize: 12,
+                                fontSize: 10,
                               ),
                             ),
                           ],
@@ -700,36 +724,29 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                       const SizedBox(height: 12),
                       ScaleButton(
                         onPressed: () async {
-                          // --- YENİ HARİTA URL MANTIĞI ---
-                          // Boşlukları ve Türkçe karakterleri + işaretine ve uygun formata çeviren güvenli yöntem
                           final String rawQuery =
                               "${location['addressTitle']} ${location['neighborhood']} ${location['district']} ${location['city']}";
                           final String encodedQuery = Uri.encodeComponent(
                             rawQuery,
                           );
-                          // Universal Google Maps Search Linki
                           final Uri mapUrl = Uri.parse(
                             "https://www.google.com/maps/search/?api=1&query=$encodedQuery",
                           );
-
                           try {
-                            // Doğrudan fırlat, sistem haritaları açsın
                             await launchUrl(
                               mapUrl,
                               mode: LaunchMode.externalApplication,
                             );
                           } catch (e) {
-                            if (mounted) {
+                            if (mounted)
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
                                     "Harita uygulaması açılamadı. Hata: $e",
-                                    style: GoogleFonts.poppins(),
                                   ),
                                   backgroundColor: Colors.redAccent,
                                 ),
                               );
-                            }
                           }
                         },
                         child: Container(
@@ -780,18 +797,6 @@ class _CoachDetailScreenState extends State<CoachDetailScreen> {
                                           ),
                                         ),
                                       ],
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.white10,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.navigation_rounded,
-                                      color: Colors.white,
-                                      size: 18,
                                     ),
                                   ),
                                 ],
@@ -902,7 +907,12 @@ class _AthleteCalendarModal extends StatefulWidget {
 
 class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
   DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay = DateTime.now();
+
+  final Set<DateTime> _selectedDays = {};
+  final Map<DateTime, String> _selectedSlots = {};
+  final Map<DateTime, bool> _selectedRecurring = {};
+
+  bool _isMultiSelectMode = false;
 
   List<Map<String, dynamic>> _lessons = [];
   List<Map<String, dynamic>> _activities = [];
@@ -910,30 +920,25 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
 
   StreamSubscription? _lessonsSub, _activitiesSub, _routinesSub;
 
-  String? _selectedSport; // SPORCUNUN SEÇECEĞİ ÖZEL DERS BRANŞI
-  String? _selectedStartTime;
-  String? _selectedEndTime;
+  String? _selectedSport;
   String _selectedLessonType = 'Online';
   bool _isSubmitting = false;
 
-  late List<dynamic> _availableDays;
   late String _coachUid;
+  late int _defaultPrice; // Hocanın profildeki ortalama fiyatı
 
   @override
   void initState() {
     super.initState();
     _coachUid = widget.coachData['uid'] ?? '';
-    _availableDays = widget.coachData['availableDays'] ?? [];
+    _defaultPrice = widget.coachData['hourlyRate'] ?? 0;
+
+    _selectedDays.add(
+      DateTime(_focusedDay.year, _focusedDay.month, _focusedDay.day),
+    );
+
     if (widget.coachData['deliveryMode'] == 'Yüzyüze') {
       _selectedLessonType = 'Yüzyüze';
-    }
-
-    // VARSAYILAN BRANŞI AYARLA
-    List<dynamic> specs = widget.coachData['specialties'] ?? [];
-    if (specs.isNotEmpty) {
-      _selectedSport = specs.first.toString();
-    } else {
-      _selectedSport = widget.coachData['lessonSport'] ?? 'Genel';
     }
 
     _setupStreams();
@@ -941,35 +946,33 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
 
   void _setupStreams() {
     final db = FirebaseFirestore.instance;
+    // Onaylanan dersler çekiliyor ki müsaitlikten düşülebilsin
     _lessonsSub = db
         .collection('lessons')
         .where('coachId', isEqualTo: _coachUid)
         .where('status', isEqualTo: 'approved')
         .snapshots()
         .listen((snap) {
-          if (mounted) {
+          if (mounted)
             setState(() => _lessons = snap.docs.map((d) => d.data()).toList());
-          }
         });
     _activitiesSub = db
         .collection('coach_manual_activities')
         .where('coachId', isEqualTo: _coachUid)
         .snapshots()
         .listen((snap) {
-          if (mounted) {
+          if (mounted)
             setState(
               () => _activities = snap.docs.map((d) => d.data()).toList(),
             );
-          }
         });
     _routinesSub = db
         .collection('coach_routines')
         .where('coachId', isEqualTo: _coachUid)
         .snapshots()
         .listen((snap) {
-          if (mounted) {
+          if (mounted)
             setState(() => _routines = snap.docs.map((d) => d.data()).toList());
-          }
         });
   }
 
@@ -981,174 +984,101 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
     super.dispose();
   }
 
-  String _getWeekdayString(int weekday) {
-    switch (weekday) {
-      case 1:
-        return "Pazartesi";
-      case 2:
-        return "Salı";
-      case 3:
-        return "Çarşamba";
-      case 4:
-        return "Perşembe";
-      case 5:
-        return "Cuma";
-      case 6:
-        return "Cumartesi";
-      case 7:
-        return "Pazar";
-      default:
-        return "";
-    }
-  }
-
-  List<String> _getValidHours() {
-    List<dynamic> availableRanges = widget.coachData['availableHours'] ?? [];
-    Set<int> hours = {};
-    for (String range in availableRanges) {
-      var parts = range.split('-');
-      if (parts.length == 2) {
-        int start = int.tryParse(parts[0].split(':')[0].trim()) ?? 0;
-        int end = int.tryParse(parts[1].split(':')[0].trim()) ?? 0;
-        if (end == 0) end = 24;
-        for (int i = start; i <= end; i++) {
-          hours.add(i);
-        }
-      }
-    }
-    if (hours.isEmpty) {
-      for (int i = 8; i <= 22; i++) {
-        hours.add(i);
-      }
-    }
-    List<int> sorted = hours.toList()..sort();
-    return sorted.map((h) => "${h.toString().padLeft(2, '0')}:00").toList();
-  }
-
-  Map<String, dynamic> _getDayData(DateTime day) {
-    String dayName = _getWeekdayString(day.weekday);
+  // Öğrenci sadece MÜSAİT olduğu Özel Ders ve Grup Derslerini yeşil/mavi noktalarla görecek. Meşgul veya Onaylı saatler nokta olarak basılmayacak.
+  List<String> _getEventTypesForDay(DateTime day) {
     String dateStr = DateFormat('yyyy-MM-dd').format(day);
+    if (day.isBefore(DateTime.now().subtract(const Duration(days: 1))))
+      return [];
 
-    bool isAvailDay = _availableDays.contains(dayName);
-    bool hasUnavailable = false;
-    List<String> busyHours = [];
+    List<String> types = [];
 
-    for (var l in _lessons) {
-      if (l['lessonType'] != 'Grup Dersi' &&
-          (l['days'] as List).contains(dayName)) {
-        var h = (l['hours'] as List).map((e) => e.toString()).toList();
-        busyHours.addAll(h);
+    // O gün için hocanın aktif ve müsait grup dersi var mı?
+    bool hasAvailableGroup =
+        _activities.any(
+          (a) =>
+              a['date'] == dateStr &&
+              a['isGroupLesson'] == true &&
+              a['isUnavailable'] != true,
+        ) ||
+        _routines.any(
+          (r) =>
+              isRoutineValidForDay(r, day) &&
+              r['isGroupLesson'] == true &&
+              r['isUnavailable'] != true,
+        );
+    if (hasAvailableGroup) types.add('group');
+
+    // O gün için hocanın aktif ve müsait özel dersi var mı? (Ekstra olarak ders saatleriyle çakışmayan saat var mı diye tam fonksiyondan kontrol etmeliyiz)
+    if (_getAvailablePrivateSlotsForDay(day).isNotEmpty) {
+      types.add('private');
+    }
+
+    return types;
+  }
+
+  // Belirli bir gün için boş (alınmamış ve meşgul işaretlenmemiş) Özel Ders saatlerini getirir
+  List<Map<String, dynamic>> _getAvailablePrivateSlotsForDay(DateTime day) {
+    String dateStr = DateFormat('yyyy-MM-dd').format(day);
+    List<Map<String, dynamic>> slots = [];
+
+    for (var act in _activities) {
+      if (act['date'] == dateStr &&
+          act['isPrivateLesson'] == true &&
+          act['isUnavailable'] != true) {
+        slots.add({
+          'hour': act['hour'],
+          'isRoutine': false,
+          'price': act['price'] ?? _defaultPrice,
+          'sport': act['sport'],
+        });
       }
     }
     for (var r in _routines) {
-      if ((r['days'] as List).contains(dayName)) {
-        if (r['isUnavailable'] == true) hasUnavailable = true;
-        if (r['hour'] != null && r['hour'] != '') busyHours.add(r['hour']);
-      }
-    }
-    for (var a in _activities) {
-      if (a['date'] == dateStr) {
-        if (a['isUnavailable'] == true) hasUnavailable = true;
-        if (a['hour'] != null && a['hour'] != '') busyHours.add(a['hour']);
-      }
-    }
-
-    var allEvents = [
-      ..._activities.where((a) => a['date'] == dateStr),
-      ..._routines.where((r) => (r['days'] as List).contains(dayName)),
-    ];
-    for (var ev in allEvents) {
-      if (ev['isGroupLesson'] == true) {
-        int enrolled =
-            (ev['currentEnrolled'] ?? 0) +
-            _lessons
-                .where(
-                  (l) =>
-                      l['lessonType'] == 'Grup Dersi' &&
-                      (l['hours'] as List).contains(ev['hour']),
-                )
-                .length;
-        if (enrolled >= (ev['maxCapacity'] ?? 10)) {
-          if (ev['hour'] != null) busyHours.add(ev['hour']);
-        }
+      if (isRoutineValidForDay(r, day) &&
+          r['isPrivateLesson'] == true &&
+          r['isUnavailable'] != true) {
+        slots.add({
+          'hour': r['hour'],
+          'isRoutine': true,
+          'price': r['price'] ?? _defaultPrice,
+          'sport': r['sport'],
+        });
       }
     }
 
-    return {
-      'isRed': hasUnavailable,
-      'isYellow': !hasUnavailable && busyHours.isNotEmpty,
-      'isGreen': isAvailDay && !hasUnavailable && busyHours.isEmpty,
-      'busyHours': busyHours.toSet().toList()..sort(),
-    };
+    List<String> busyHours = [];
+    for (var act in _activities) {
+      if (act['date'] == dateStr && act['isUnavailable'] == true)
+        busyHours.add(act['hour']);
+    }
+    for (var r in _routines) {
+      if (isRoutineValidForDay(r, day) && r['isUnavailable'] == true)
+        busyHours.add(r['hour']);
+    }
+    for (var l in _lessons) {
+      if ((l['days'] as List).contains(getWeekdayString(day.weekday)) ||
+          l['date'] == dateStr) {
+        busyHours.addAll((l['hours'] as List).map((e) => e.toString()));
+      }
+    }
+
+    slots.removeWhere((s) => busyHours.contains(s['hour']));
+
+    var uniqueSlots = <String, Map<String, dynamic>>{};
+    for (var s in slots) {
+      uniqueSlots[s['hour']] = s;
+    }
+
+    var result = uniqueSlots.values.toList();
+    result.sort((a, b) => (a['hour'] as String).compareTo(b['hour'] as String));
+    return result;
   }
 
-  Widget _buildDayCell(DateTime day, bool isSelected) {
-    var data = _getDayData(day);
-    bool isRed = data['isRed'];
-    bool isYellow = data['isYellow'];
-    bool isGreen = data['isGreen'];
-    Color? bgColor;
-    Color txtColor = Colors.white70;
+  Future<void> _submitMultiDayRequest() async {
+    if (_selectedDays.isEmpty) return;
+    if (_selectedSlots.length != _selectedDays.length)
+      return; // Buton inaktif, yine de koruma
 
-    if (isRed) {
-      bgColor = Colors.redAccent.withOpacity(isSelected ? 0.8 : 0.25);
-      txtColor = isSelected ? Colors.white : Colors.redAccent;
-    } else if (isYellow) {
-      bgColor = Colors.amber.withOpacity(isSelected ? 0.8 : 0.25);
-      txtColor = isSelected ? Colors.black : Colors.amber;
-    } else if (isGreen) {
-      bgColor = ColorConstants.primaryColor.withOpacity(
-        isSelected ? 0.8 : 0.15,
-      );
-      txtColor = isSelected ? Colors.black : ColorConstants.primaryColor;
-    } else if (isSelected) {
-      bgColor = Colors.white24;
-      txtColor = Colors.white;
-    }
-
-    return Container(
-      margin: const EdgeInsets.all(4),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: bgColor,
-        shape: BoxShape.circle,
-        border: isSelected ? Border.all(color: Colors.white, width: 1.5) : null,
-      ),
-      child: Text(
-        '${day.day}',
-        style: GoogleFonts.poppins(
-          color: txtColor,
-          fontWeight: bgColor != null ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _submitLessonRequest(
-    bool isPreMeeting, {
-    String? customHourRange,
-    String? specificType,
-    String? specificSport, // GRUP DERSİ VEYA ÖZEL SEÇİM İÇİN
-  }) async {
-    String finalHours =
-        customHourRange ?? "$_selectedStartTime - $_selectedEndTime";
-    String finalType = specificType ?? _selectedLessonType;
-    String finalSport = isPreMeeting
-        ? "Ön Görüşme (10 Dk)"
-        : (specificSport ??
-              _selectedSport ??
-              widget.coachData['lessonSport'] ??
-              "Genel");
-
-    if (finalHours.contains('null')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Lütfen saat seçin.", style: GoogleFonts.poppins()),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
     setState(() => _isSubmitting = true);
     try {
       final currentUser = FirebaseAuth.instance.currentUser!;
@@ -1159,13 +1089,31 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
       final String myName =
           "${myDoc.data()?['name'] ?? ''} ${myDoc.data()?['surname'] ?? ''}"
               .trim();
-      final String? myImage = myDoc.data()?['profileImageUrl'];
       final String coachFullName =
           "${widget.coachData['name'] ?? ''} ${widget.coachData['surname'] ?? ''}"
               .trim();
 
-      String dateStr = DateFormat('yyyy-MM-dd').format(_selectedDay!);
-      int price = isPreMeeting ? 0 : (widget.coachData['hourlyRate'] ?? 0);
+      List<Map<String, dynamic>> requestedSlots = [];
+      int totalPrice =
+          0; // Çoklu talebin toplam veya ortalama fiyatını da tutabiliriz. Şimdilik sadece dinamik fiyatları atıyoruz.
+
+      for (var day in _selectedDays) {
+        String selectedHour = _selectedSlots[day]!;
+        // Fiyatı ve branşı bul
+        var slotsForDay = _getAvailablePrivateSlotsForDay(day);
+        var selectedSlotData = slotsForDay.firstWhere(
+          (element) => element['hour'] == selectedHour,
+          orElse: () => {'price': _defaultPrice},
+        );
+
+        requestedSlots.add({
+          'date': DateFormat('yyyy-MM-dd').format(day),
+          'dayName': getWeekdayString(day.weekday),
+          'hour': selectedHour,
+          'isRecurringRequest': _selectedRecurring[day] == true,
+          'price': selectedSlotData['price'],
+        });
+      }
 
       await FirebaseFirestore.instance.collection('lessons').add({
         'coachId': _coachUid,
@@ -1173,14 +1121,12 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
         'coachImage': widget.coachData['profileImageUrl'],
         'athleteId': currentUser.uid,
         'athleteName': myName.isEmpty ? "Öğrenci" : myName,
-        'athleteImage': myImage,
-        'sport': finalSport,
-        'days': [_getWeekdayString(_selectedDay!.weekday)],
-        'date': dateStr,
-        'hours': [finalHours],
-        'price': price,
+        'athleteImage': myDoc.data()?['profileImageUrl'],
+        'sport': _selectedSport ?? widget.coachData['lessonSport'] ?? "Genel",
         'status': 'pending',
-        'lessonType': finalType,
+        'lessonType': _selectedLessonType,
+        'isUnifiedRequest': true,
+        'requestedSlots': requestedSlots,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
@@ -1189,9 +1135,7 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              isPreMeeting
-                  ? "Ön görüşme talebi iletildi!"
-                  : "Ders talebiniz başarıyla iletildi! Onaylandığında bildirim alacaksınız.",
+              "Talebiniz başarıyla iletildi! Onaylandığında bildirim alacaksınız.",
               style: GoogleFonts.poppins(),
             ),
             backgroundColor: Colors.green,
@@ -1200,18 +1144,175 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Hata: $e", style: GoogleFonts.poppins()),
-          backgroundColor: Colors.redAccent,
-        ),
+        SnackBar(content: Text("Hata: $e"), backgroundColor: Colors.redAccent),
       );
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
+  Future<void> _submitGroupLessonRequest(
+    Map<String, dynamic> groupEvent,
+    DateTime day,
+  ) async {
+    setState(() => _isSubmitting = true);
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser!;
+      final myDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      final String myName =
+          "${myDoc.data()?['name'] ?? ''} ${myDoc.data()?['surname'] ?? ''}"
+              .trim();
+      final String coachFullName =
+          "${widget.coachData['name'] ?? ''} ${widget.coachData['surname'] ?? ''}"
+              .trim();
+
+      bool isRoutine = groupEvent['isRoutine'] ?? false;
+
+      await FirebaseFirestore.instance.collection('lessons').add({
+        'coachId': _coachUid,
+        'coachName': coachFullName,
+        'coachImage': widget.coachData['profileImageUrl'],
+        'athleteId': currentUser.uid,
+        'athleteName': myName.isEmpty ? "Öğrenci" : myName,
+        'athleteImage': myDoc.data()?['profileImageUrl'],
+        'sport':
+            groupEvent['sport'] ?? widget.coachData['lessonSport'] ?? "Genel",
+        'status': 'pending',
+        'lessonType': 'Grup Dersi',
+        'isUnifiedRequest': true,
+        'requestedSlots': [
+          {
+            'date': DateFormat('yyyy-MM-dd').format(day),
+            'dayName': getWeekdayString(day.weekday),
+            'hour': groupEvent['hour'],
+            'isRecurringRequest': isRoutine,
+            'price': groupEvent['price'] ?? _defaultPrice, // YENİ
+          },
+        ],
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Grup dersi talebi iletildi!",
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Hata: $e"), backgroundColor: Colors.redAccent),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Widget _buildLegendItem(Color color, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    List<Map<String, dynamic>> todayGroupLessons = [];
+    if (_selectedDays.length == 1) {
+      DateTime day = _selectedDays.first;
+      String dateStr = DateFormat('yyyy-MM-dd').format(day);
+      todayGroupLessons = [
+        ..._activities
+            .where(
+              (a) =>
+                  a['date'] == dateStr &&
+                  a['isGroupLesson'] == true &&
+                  a['isUnavailable'] != true,
+            )
+            .map((e) => {...e, 'isRoutine': false}),
+        ..._routines
+            .where(
+              (r) =>
+                  isRoutineValidForDay(r, day) &&
+                  r['isGroupLesson'] == true &&
+                  r['isUnavailable'] != true,
+            )
+            .map((e) => {...e, 'isRoutine': true}),
+      ];
+    }
+
+    // YENİ: Dersi Al Butonunun Aktif/İnaktif Durumu Kontrolü
+    bool canSubmitRequest = false;
+    int selectedTotalPrice = 0; // Dinamik Fiyatı Ekrana Basmak İçin
+
+    if (_selectedDays.isNotEmpty &&
+        _selectedSlots.length == _selectedDays.length) {
+      canSubmitRequest = true;
+      for (var day in _selectedDays) {
+        var slots = _getAvailablePrivateSlotsForDay(day);
+        var slotData = slots.firstWhere(
+          (s) => s['hour'] == _selectedSlots[day],
+          orElse: () => {},
+        );
+        if (slotData.isNotEmpty && slotData['price'] != null) {
+          selectedTotalPrice += (slotData['price'] as num).toInt();
+        } else {
+          selectedTotalPrice += _defaultPrice;
+        }
+      }
+    }
+
+    // YENİ: Dinamik Branş Filtresi
+    List<String> dynamicAvailableSports = [];
+    if (_selectedDays.isNotEmpty) {
+      for (var day in _selectedDays) {
+        if (_selectedSlots[day] != null) {
+          var slots = _getAvailablePrivateSlotsForDay(day);
+          var slotData = slots.firstWhere(
+            (s) => s['hour'] == _selectedSlots[day],
+            orElse: () => {},
+          );
+          if (slotData.isNotEmpty &&
+              slotData['sport'] != null &&
+              !dynamicAvailableSports.contains(slotData['sport'])) {
+            dynamicAvailableSports.add(slotData['sport']);
+          }
+        }
+      }
+    }
+    // Eğer o saatler için özel branş girilmemişse hocanın genel branşlarını gösterelim
+    if (dynamicAvailableSports.isEmpty) {
+      dynamicAvailableSports = widget.coachData['specialties'] != null
+          ? (widget.coachData['specialties'] as List)
+                .map((e) => e.toString())
+                .toList()
+          : ['Genel'];
+    }
+    // Seçili branş eğer gelen dinamik listede yoksa ilk elemana eşitleyelim
+    if (_selectedSport == null ||
+        !dynamicAvailableSports.contains(_selectedSport)) {
+      _selectedSport = dynamicAvailableSports.first;
+    }
+
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF1E1E1E),
@@ -1234,7 +1335,7 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
           const SizedBox(height: 16),
           Center(
             child: Text(
-              "Ders Saati Seçin",
+              "Takvim & Ders Seçimi",
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontSize: 18,
@@ -1242,98 +1343,103 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
               ),
             ),
           ),
+          const SizedBox(height: 4),
+          Center(
+            child: Text(
+              "Birden fazla gün seçmek için günlerin üzerine basılı tutun.",
+              style: GoogleFonts.poppins(
+                color: ColorConstants.primaryColor,
+                fontSize: 11,
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 16,
-            runSpacing: 8,
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: ColorConstants.primaryColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    "Müsait",
-                    style: GoogleFonts.poppins(
-                      color: Colors.white54,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: Colors.amber,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    "Kısmen Dolu",
-                    style: GoogleFonts.poppins(
-                      color: Colors.white54,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: Colors.redAccent,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    "Tamamen Dolu",
-                    style: GoogleFonts.poppins(
-                      color: Colors.white54,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
+              _buildLegendItem(Colors.greenAccent, "Özel Ders"),
+              const SizedBox(width: 16),
+              _buildLegendItem(Colors.blueAccent, "Grup Dersi"),
             ],
           ),
           const SizedBox(height: 12),
+
           TableCalendar(
             locale: 'tr_TR',
-            firstDay: DateTime.utc(2023, 1, 1),
-            lastDay: DateTime.utc(2030, 12, 31),
+            firstDay: DateTime.now().subtract(const Duration(days: 30)),
+            lastDay: DateTime.now().add(const Duration(days: 365)),
             focusedDay: _focusedDay,
-            selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+            selectedDayPredicate: (day) =>
+                _selectedDays.any((d) => isSameDay(d, day)),
             onDaySelected: (sel, foc) {
+              DateTime normalized = DateTime(sel.year, sel.month, sel.day);
               setState(() {
-                _selectedDay = sel;
+                if (_isMultiSelectMode) {
+                  if (_selectedDays.any((d) => isSameDay(d, normalized))) {
+                    _selectedDays.removeWhere((d) => isSameDay(d, normalized));
+                    _selectedSlots.removeWhere(
+                      (d, _) => isSameDay(d, normalized),
+                    );
+                    _selectedRecurring.removeWhere(
+                      (d, _) => isSameDay(d, normalized),
+                    );
+                    if (_selectedDays.isEmpty) _isMultiSelectMode = false;
+                  } else {
+                    _selectedDays.add(normalized);
+                  }
+                } else {
+                  _selectedDays.clear();
+                  _selectedSlots.clear();
+                  _selectedRecurring.clear();
+                  _selectedDays.add(normalized);
+                }
                 _focusedDay = foc;
-                _selectedStartTime = null;
-                _selectedEndTime = null;
+              });
+            },
+            onDayLongPressed: (sel, foc) {
+              DateTime normalized = DateTime(sel.year, sel.month, sel.day);
+              setState(() {
+                _isMultiSelectMode = true;
+                _selectedDays.add(normalized);
+                _focusedDay = foc;
               });
             },
             startingDayOfWeek: StartingDayOfWeek.monday,
             calendarBuilders: CalendarBuilders(
-              defaultBuilder: (ctx, day, foc) => _buildDayCell(day, false),
-              todayBuilder: (ctx, day, foc) =>
-                  _buildDayCell(day, isSameDay(day, _selectedDay)),
-              selectedBuilder: (ctx, day, foc) => _buildDayCell(day, true),
+              markerBuilder: (context, day, focusedDay) {
+                final types = _getEventTypesForDay(day);
+                if (types.isEmpty) return const SizedBox();
+                List<Widget> dots = [];
+                if (types.contains('private'))
+                  dots.add(
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Colors.greenAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  );
+                if (types.contains('group'))
+                  dots.add(
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Colors.blueAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  );
+                return Positioned(
+                  bottom: 6,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: dots),
+                );
+              },
             ),
             headerStyle: HeaderStyle(
               titleCentered: true,
@@ -1352,15 +1458,28 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                 color: Colors.white,
               ),
             ),
-            daysOfWeekStyle: DaysOfWeekStyle(
-              weekdayStyle: GoogleFonts.poppins(color: Colors.white70),
-              weekendStyle: GoogleFonts.poppins(
-                color: Colors.redAccent.withOpacity(0.5),
+            calendarStyle: CalendarStyle(
+              defaultTextStyle: GoogleFonts.poppins(color: Colors.white),
+              weekendTextStyle: GoogleFonts.poppins(
+                color: Colors.redAccent.withOpacity(0.8),
+              ),
+              selectedDecoration: const BoxDecoration(
+                color: ColorConstants.primaryColor,
+                shape: BoxShape.circle,
+              ),
+              selectedTextStyle: GoogleFonts.poppins(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+              todayDecoration: const BoxDecoration(
+                color: Colors.white10,
+                shape: BoxShape.circle,
               ),
             ),
           ),
           const SizedBox(height: 24),
-          if (_selectedDay != null) ...[
+
+          if (_selectedDays.isNotEmpty) ...[
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -1369,587 +1488,454 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white10),
               ),
-              child: Builder(
-                builder: (context) {
-                  var data = _getDayData(_selectedDay!);
-                  List<String> hours = data['busyHours'];
-                  List<String> validHours = _getValidHours();
-
-                  String dayName = _getWeekdayString(_selectedDay!.weekday);
-                  String dateStr = DateFormat(
-                    'yyyy-MM-dd',
-                  ).format(_selectedDay!);
-                  List<Map<String, dynamic>> todayGroupLessons = [
-                    ..._activities.where(
-                      (a) => a['date'] == dateStr && a['isGroupLesson'] == true,
-                    ),
-                    ..._routines.where(
-                      (r) =>
-                          (r['days'] as List).contains(dayName) &&
-                          r['isGroupLesson'] == true,
-                    ),
-                  ];
-
-                  if (data['isRed']) {
-                    return Column(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_selectedDays.length == 1 &&
+                      todayGroupLessons.isNotEmpty) ...[
+                    Row(
                       children: [
                         const Icon(
-                          Icons.block_rounded,
-                          color: Colors.redAccent,
-                          size: 30,
+                          Icons.groups_rounded,
+                          color: Colors.blueAccent,
+                          size: 20,
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(width: 8),
                         Text(
-                          "Antrenör bu günü kapattı.",
+                          "Grup Dersleri (Bugün)",
                           style: GoogleFonts.poppins(
-                            color: Colors.redAccent,
+                            color: Colors.blueAccent,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
-                          "Bu tarih için ders talebi oluşturulamaz.",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white54,
-                            fontSize: 12,
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...todayGroupLessons.map((gEvent) {
+                      int totalEnrolled =
+                          (gEvent['currentEnrolled'] ?? 0) +
+                          _lessons
+                              .where(
+                                (l) =>
+                                    l['lessonType'] == 'Grup Dersi' &&
+                                    (l['hours'] as List).contains(
+                                      gEvent['hour'],
+                                    ),
+                              )
+                              .length;
+                      int maxCap = gEvent['maxCapacity'] ?? 10;
+                      bool isFull = totalEnrolled >= maxCap;
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blueAccent.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.blueAccent.withOpacity(0.3),
                           ),
                         ),
-                      ],
-                    );
-                  } else if (data['isYellow'] || data['isGreen']) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (todayGroupLessons.isNotEmpty) ...[
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.groups_rounded,
-                                color: Colors.blueAccent,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    gEvent['title'] ?? 'Grup Dersi',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white10,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    gEvent['hour'] ?? '',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  "Branş: ${gEvent['sport'] ?? widget.coachData['lessonSport'] ?? 'Genel'}",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.blueAccent,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  "${gEvent['price'] ?? _defaultPrice} ₺",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.greenAccent,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ), // YENİ
+                              ],
+                            ),
+                            if (gEvent['isRoutine'] == true) ...[
+                              const SizedBox(height: 4),
                               Text(
-                                "Bugünün Grup Dersleri",
+                                "🔄 Her Hafta Tekrar Eden Ders",
                                 style: GoogleFonts.poppins(
-                                  color: Colors.blueAccent,
+                                  color: Colors.amber,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 12),
-                          ...todayGroupLessons.map((gEvent) {
-                            int totalEnrolled =
-                                (gEvent['currentEnrolled'] ?? 0) +
-                                _lessons
-                                    .where(
-                                      (l) =>
-                                          l['lessonType'] == 'Grup Dersi' &&
-                                          (l['hours'] as List).contains(
-                                            gEvent['hour'],
-                                          ),
-                                    )
-                                    .length;
-                            int maxCap = gEvent['maxCapacity'] ?? 10;
-                            bool isFull = totalEnrolled >= maxCap;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.blueAccent.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: Colors.blueAccent.withOpacity(0.3),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.people_alt_rounded,
+                                  color: Colors.blueAccent,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  "Kayıtlı: $totalEnrolled / $maxCap Kişi",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: isFull
+                                    ? null
+                                    : () {
+                                        if (FirebaseAuth.instance.currentUser ==
+                                            null) {
+                                          showGuestRegistrationPopup(context);
+                                          return;
+                                        }
+                                        _submitGroupLessonRequest(
+                                          gEvent,
+                                          _selectedDays.first,
+                                        );
+                                      },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isFull
+                                      ? Colors.white10
+                                      : Colors.blueAccent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text(
+                                  isFull ? "Kontenjan Dolu" : "Hemen Katıl",
+                                  style: GoogleFonts.poppins(
+                                    color: isFull
+                                        ? Colors.white38
+                                        : Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          gEvent['title'] ?? 'Grup Dersi',
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white10,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          gEvent['hour'] ?? '',
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    const SizedBox(height: 16),
+                    const Divider(color: Colors.white10),
+                    const SizedBox(height: 16),
+                  ],
+
+                  Text(
+                    _selectedDays.length > 1
+                        ? "Toplu Özel Ders Talep Et"
+                        : "Özel Ders Talep Et",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  ...(_selectedDays.toList()..sort()).map((day) {
+                    List<Map<String, dynamic>> availableSlots =
+                        _getAvailablePrivateSlotsForDay(day);
+                    String dayStr = DateFormat(
+                      'dd MMM, EEEE',
+                      'tr_TR',
+                    ).format(day);
+
+                    bool isSelectedSlotRoutine = false;
+                    int selectedSlotPrice = _defaultPrice;
+                    if (_selectedSlots[day] != null) {
+                      var sData = availableSlots.firstWhere(
+                        (element) => element['hour'] == _selectedSlots[day],
+                        orElse: () => {},
+                      );
+                      if (sData.isNotEmpty) {
+                        if (sData['isRoutine'] == true)
+                          isSelectedSlotRoutine = true;
+                        if (sData['price'] != null)
+                          selectedSlotPrice = sData['price'];
+                      }
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                dayStr,
+                                style: GoogleFonts.poppins(
+                                  color: ColorConstants.primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (_selectedSlots[day] != null)
+                                Text(
+                                  "$selectedSlotPrice ₺",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.greenAccent,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    "Branş: ${gEvent['sport'] ?? widget.coachData['lessonSport'] ?? 'Genel'}",
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.blueAccent,
-                                      fontSize: 12,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          availableSlots.isEmpty
+                              ? Text(
+                                  "Bu gün için uygun saat bulunmamaktadır.",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.redAccent,
+                                    fontSize: 12,
+                                  ),
+                                )
+                              : Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: availableSlots.map((slotData) {
+                                    String h = slotData['hour'];
+                                    bool isSelected = _selectedSlots[day] == h;
+                                    return ChoiceChip(
+                                      label: Text(h),
+                                      selected: isSelected,
+                                      selectedColor:
+                                          ColorConstants.primaryColor,
+                                      backgroundColor: Colors.white10,
+                                      labelStyle: GoogleFonts.poppins(
+                                        color: isSelected
+                                            ? Colors.black
+                                            : Colors.white,
+                                      ),
+                                      onSelected: (val) {
+                                        setState(() {
+                                          if (val) {
+                                            _selectedSlots[day] = h;
+                                            _selectedRecurring[day] = false;
+                                          }
+                                        });
+                                      },
+                                    );
+                                  }).toList(),
+                                ),
+                          if (isSelectedSlotRoutine) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.blueAccent.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.blueAccent.withOpacity(0.2),
+                                ),
+                              ),
+                              child: CheckboxListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                activeColor: ColorConstants.primaryColor,
+                                checkColor: Colors.black,
+                                title: Text(
+                                  "Bu dersi her hafta tekrarlı olarak talep et",
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                value: _selectedRecurring[day] ?? false,
+                                onChanged: (val) => setState(
+                                  () => _selectedRecurring[day] = val ?? false,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+
+                  const Divider(color: Colors.white10),
+                  const SizedBox(height: 16),
+
+                  Text(
+                    "Branş Seçin",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white70,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: dynamicAvailableSports.map((s) {
+                      final isSelected = _selectedSport == s.toString();
+                      return ChoiceChip(
+                        label: Text(s.toString()),
+                        selected: isSelected,
+                        selectedColor: ColorConstants.primaryColor,
+                        backgroundColor: Colors.white10,
+                        labelStyle: GoogleFonts.poppins(
+                          color: Colors.black,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                        onSelected: (val) {
+                          if (val)
+                            setState(() => _selectedSport = s.toString());
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Text(
+                    "Özel Ders Tipi",
+                    style: GoogleFonts.poppins(
+                      color: Colors.white70,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: ['Online', 'Yüzyüze'].map((type) {
+                      final isSelected = _selectedLessonType == type;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: ChoiceChip(
+                          label: Text(type),
+                          selected: isSelected,
+                          selectedColor: ColorConstants.primaryColor,
+                          backgroundColor: Colors.white10,
+                          labelStyle: GoogleFonts.poppins(
+                            color: Colors.black,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                          onSelected: (val) {
+                            if (val) setState(() => _selectedLessonType = type);
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ScaleButton(
+                          onPressed: () {
+                            if (!canSubmitRequest) return;
+                            if (FirebaseAuth.instance.currentUser == null) {
+                              showGuestRegistrationPopup(context);
+                              return;
+                            }
+                            if (!_isSubmitting) _submitMultiDayRequest();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: canSubmitRequest
+                                  ? ColorConstants.primaryColor
+                                  : Colors.redAccent.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: _isSubmitting
+                                ? const Center(
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.black,
+                                        strokeWidth: 2,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(
-                                        Icons.people_alt_rounded,
-                                        color: Colors.blueAccent,
-                                        size: 16,
+                                      Icon(
+                                        canSubmitRequest
+                                            ? Icons.bolt_rounded
+                                            : Icons.block_rounded,
+                                        color: canSubmitRequest
+                                            ? Colors.black
+                                            : Colors.white54,
+                                        size: 20,
                                       ),
                                       const SizedBox(width: 6),
                                       Text(
-                                        "Kayıtlı: $totalEnrolled / $maxCap Kişi",
+                                        canSubmitRequest
+                                            ? (_selectedDays.length > 1
+                                                  ? "Toplam: $selectedTotalPrice ₺ • Talebi Gönder"
+                                                  : "Dersi Al ($selectedTotalPrice ₺)")
+                                            : "Lütfen Saat Seçin",
                                         style: GoogleFonts.poppins(
-                                          color: Colors.white70,
-                                          fontSize: 13,
+                                          color: canSubmitRequest
+                                              ? Colors.black
+                                              : Colors.white54,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: isFull
-                                          ? null
-                                          : () {
-                                              if (FirebaseAuth
-                                                      .instance
-                                                      .currentUser ==
-                                                  null) {
-                                                showGuestRegistrationPopup(
-                                                  context,
-                                                );
-                                                return;
-                                              }
-                                              _submitLessonRequest(
-                                                false,
-                                                customHourRange: gEvent['hour'],
-                                                specificType: 'Grup Dersi',
-                                                specificSport: gEvent['sport'],
-                                              );
-                                            },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: isFull
-                                            ? Colors.white10
-                                            : Colors.blueAccent,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        isFull
-                                            ? "Kontenjan Dolu"
-                                            : "Hemen Katıl",
-                                        style: GoogleFonts.poppins(
-                                          color: isFull
-                                              ? Colors.white38
-                                              : Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          const SizedBox(height: 16),
-                          const Divider(color: Colors.white10),
-                          const SizedBox(height: 16),
-                        ],
-
-                        Text(
-                          "Özel Ders Talep Et",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 12),
-
-                        Text(
-                          "Branş Seçin",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children:
-                              widget.coachData['specialties'] != null &&
-                                  (widget.coachData['specialties'] as List)
-                                      .isNotEmpty
-                              ? (widget.coachData['specialties'] as List).map((
-                                  s,
-                                ) {
-                                  final isSelected =
-                                      _selectedSport == s.toString();
-                                  return ChoiceChip(
-                                    label: Text(s.toString()),
-                                    selected: isSelected,
-                                    selectedColor: ColorConstants.primaryColor,
-                                    backgroundColor: Colors.white10,
-                                    labelStyle: GoogleFonts.poppins(
-                                      color: Colors.black,
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                    ),
-                                    onSelected: (val) {
-                                      if (val) {
-                                        setState(
-                                          () => _selectedSport = s.toString(),
-                                        );
-                                      }
-                                    },
-                                  );
-                                }).toList()
-                              : [
-                                  ChoiceChip(
-                                    label: Text(
-                                      widget.coachData['lessonSport'] ??
-                                          'Genel',
-                                    ),
-                                    selected: true,
-                                    selectedColor: ColorConstants.primaryColor,
-                                    backgroundColor: Colors.white10,
-                                    labelStyle: GoogleFonts.poppins(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    onSelected: (val) {},
-                                  ),
-                                ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        if (data['isYellow']) ...[
-                          Text(
-                            "Aşağıdaki dolu saatler dışındaki zamanları seçebilirsiniz:",
-                            style: GoogleFonts.poppins(
-                              color: Colors.amber,
-                              fontSize: 11,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: hours
-                                .map(
-                                  (h) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.amber.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: Colors.amber.withOpacity(0.4),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      h,
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.amber,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedStartTime,
-                                dropdownColor: const Color(0xFF1E1E1E),
-                                icon: const Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  color: Colors.white54,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: "Başlangıç",
-                                  labelStyle: GoogleFonts.poppins(
-                                    color: Colors.white54,
-                                    fontSize: 13,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white10,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                items: validHours
-                                    .map(
-                                      (h) => DropdownMenuItem(
-                                        value: h,
-                                        child: Text(
-                                          h,
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (val) =>
-                                    setState(() => _selectedStartTime = val),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: _selectedEndTime,
-                                dropdownColor: const Color(0xFF1E1E1E),
-                                icon: const Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  color: Colors.white54,
-                                ),
-                                decoration: InputDecoration(
-                                  labelText: "Bitiş",
-                                  labelStyle: GoogleFonts.poppins(
-                                    color: Colors.white54,
-                                    fontSize: 13,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white10,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                items: validHours
-                                    .map(
-                                      (h) => DropdownMenuItem(
-                                        value: h,
-                                        child: Text(
-                                          h,
-                                          style: GoogleFonts.poppins(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (val) =>
-                                    setState(() => _selectedEndTime = val),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          "Özel Ders Tipi",
-                          style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: ['Online', 'Yüzyüze'].map((type) {
-                            final isSelected = _selectedLessonType == type;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: ChoiceChip(
-                                label: Text(type),
-                                selected: isSelected,
-                                selectedColor: ColorConstants.primaryColor,
-                                backgroundColor: Colors.white10,
-                                labelStyle: GoogleFonts.poppins(
-                                  color: Colors.black,
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                                onSelected: (val) {
-                                  if (val) {
-                                    setState(() => _selectedLessonType = type);
-                                  }
-                                },
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: ScaleButton(
-                                onPressed: () {
-                                  if (FirebaseAuth.instance.currentUser ==
-                                      null) {
-                                    showGuestRegistrationPopup(context);
-                                    return;
-                                  }
-                                  if (!_isSubmitting) {
-                                    _submitLessonRequest(
-                                      false,
-                                      specificType: 'Özel Ders',
-                                    );
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: ColorConstants.primaryColor,
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: _isSubmitting
-                                      ? const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.black,
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                        )
-                                      : Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            const Icon(
-                                              Icons.bolt_rounded,
-                                              color: Colors.black,
-                                              size: 20,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              "Dersi Al",
-                                              style: GoogleFonts.poppins(
-                                                color: Colors.black,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 4,
-                              child: ScaleButton(
-                                onPressed: () {
-                                  if (FirebaseAuth.instance.currentUser ==
-                                      null) {
-                                    showGuestRegistrationPopup(context);
-                                    return;
-                                  }
-                                  if (!_isSubmitting) {
-                                    _submitLessonRequest(true);
-                                  }
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange,
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: _isSubmitting
-                                      ? const Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              color: Colors.black,
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                        )
-                                      : Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            const Icon(
-                                              Icons.videocam_outlined,
-                                              color: Colors.black,
-                                              size: 20,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Flexible(
-                                              child: Text(
-                                                "Ön Görüşme Talep Et",
-                                                style: GoogleFonts.poppins(
-                                                  color: Colors.black,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  } else {
-                    return Center(
-                      child: Text(
-                        "Bu tarih antrenörün çalışma günleri arasında değildir.",
-                        style: GoogleFonts.poppins(
-                          color: Colors.white54,
-                          fontSize: 13,
-                        ),
-                        textAlign: TextAlign.center,
                       ),
-                    );
-                  }
-                },
+                    ],
+                  ),
+                ],
               ),
             ),
           ],

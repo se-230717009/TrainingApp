@@ -44,10 +44,8 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
   String? _fileName;
 
   String? _deliveryMode;
-  String? _lessonFormat; // YENİ: Özel Ders / Grup Dersi
+  String? _lessonFormat;
   String? _coachCharacter;
-
-  Map<String, List<String>> _dayHoursMap = {};
 
   String? _selectedCity;
   String? _selectedDistrict;
@@ -74,23 +72,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     "Futbol",
     "Basketbol",
   ];
-  final List<String> _daysList = [
-    "Pazartesi",
-    "Salı",
-    "Çarşamba",
-    "Perşembe",
-    "Cuma",
-    "Cumartesi",
-    "Pazar",
-  ];
-  final List<String> _hoursList = [
-    "06:00 - 09:00",
-    "09:00 - 12:00",
-    "12:00 - 15:00",
-    "15:00 - 18:00",
-    "18:00 - 21:00",
-    "21:00 - 00:00",
-  ];
+
   final List<String> _characterList = [
     "Motivatör & Enerjik",
     "Disiplinli & Güç Odaklı",
@@ -224,11 +206,11 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
       _buildStep2Bio(),
       _buildStep3References(),
       _buildStep4DeliveryMode(),
-      _buildStepLessonFormat(), // HATAYI VEREN EKSİK KISIM BUYDU, ARTIK BURADA!
+      _buildStepLessonFormat(),
     ];
     if (_needsLocation) p.add(_buildStepLocation());
-    p.add(_buildStep5Availability());
-    p.add(_buildStep6Character());
+    // Çalışma saatleri ekranı buradan tamamen çıkarıldı.
+    p.add(_buildStepCharacter());
     return p;
   }
 
@@ -290,17 +272,11 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
           "Lütfen il, ilçe ve adres bilgilerini eksiksiz doldurun.",
         );
       }
-      if (_currentIndex == 7 && _dayHoursMap.isEmpty) {
-        return _showError("Lütfen en az bir gün için saat aralığı belirleyin.");
-      }
-      if (_currentIndex == 8 && _coachCharacter == null) {
+      if (_currentIndex == 7 && _coachCharacter == null) {
         return _showError("Lütfen eğitmen karakterinizi seçin.");
       }
     } else {
-      if (_currentIndex == 6 && _dayHoursMap.isEmpty) {
-        return _showError("Lütfen en az bir gün için saat aralığı belirleyin.");
-      }
-      if (_currentIndex == 7 && _coachCharacter == null) {
+      if (_currentIndex == 6 && _coachCharacter == null) {
         return _showError("Lütfen eğitmen karakterinizi seçin.");
       }
     }
@@ -342,12 +318,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         referenceLinks.add(await storageRef.getDownloadURL());
       }
 
-      List<String> finalDays = _dayHoursMap.keys.toList();
-      List<String> finalHours = _dayHoursMap.values
-          .expand((h) => h)
-          .toSet()
-          .toList();
-
+      // availableDays, availableHours ve dayHoursMap veritabanına gönderilmiyor.
       Map<String, dynamic> updateData = {
         'specialties': _selectedSpecialties,
         'lessonSport': _selectedSpecialties.isNotEmpty
@@ -358,9 +329,6 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
         'referenceLinks': referenceLinks,
         'deliveryMode': _deliveryMode,
         'lessonFormat': _lessonFormat,
-        'availableDays': finalDays,
-        'availableHours': finalHours,
-        'dayHoursMap': _dayHoursMap,
         'coachCharacter': _coachCharacter,
         'isApproved': false,
         'isOnboardingCompleted': true,
@@ -539,7 +507,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
                 return ChoiceChip(
                   label: Text(specialty),
                   labelStyle: GoogleFonts.poppins(
-                    color: Colors.black, // Siyah Yazı (Okunabilirlik için)
+                    color: Colors.black,
                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                   ),
                   selected: isSelected,
@@ -671,7 +639,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  // --- ADIM 4: ÇALIŞMA ŞEKLİ (WRAP İLE OVERFLOW ÖNLENDİ) ---
+  // --- ADIM 4: ÇALIŞMA ŞEKLİ ---
   Widget _buildStep4DeliveryMode() {
     return _buildStepContainer(
       title: "Çalışma Şekli",
@@ -690,7 +658,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  // --- ADIM 5: DERS FORMATI (WRAP İLE OVERFLOW ÖNLENDİ) ---
+  // --- ADIM 5: DERS FORMATI ---
   Widget _buildStepLessonFormat() {
     return _buildStepContainer(
       title: "Ders Formatı",
@@ -709,7 +677,7 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  // ESNEMEYEN / TAŞMAYAN (NO-OVERFLOW) BUTON MİMARİSİ
+  // ESNEMEYEN BUTON MİMARİSİ
   Widget _buildModeButton(String label, IconData icon, bool isDelivery) {
     final isSelected = isDelivery
         ? _deliveryMode == label
@@ -882,150 +850,8 @@ class _CoachOnboardingScreenState extends State<CoachOnboardingScreen> {
     );
   }
 
-  // --- ADIM 7: ÇALIŞMA SAATLERİ (POP-UP) ---
-  Widget _buildStep5Availability() {
-    return _buildStepContainer(
-      title: "Çalışma Saatleri",
-      subtitle: "Müsait olduğunuz günleri ve saatleri belirleyin.",
-      child: ListView.separated(
-        itemCount: _daysList.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          String day = _daysList[index];
-          List<String> selectedHours = _dayHoursMap[day] ?? [];
-          bool isSelected = selectedHours.isNotEmpty;
-
-          return ListTile(
-            onTap: () => _showHoursPopup(day),
-            tileColor: isSelected
-                ? ColorConstants.primaryColor.withOpacity(0.1)
-                : Colors.white10,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(
-                color: isSelected
-                    ? ColorConstants.primaryColor.withOpacity(0.5)
-                    : Colors.transparent,
-              ),
-            ),
-            title: Text(
-              day,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            subtitle: Text(
-              isSelected
-                  ? selectedHours.join(', ')
-                  : "Saat seçmek için dokunun",
-              style: GoogleFonts.poppins(
-                color: isSelected
-                    ? ColorConstants.primaryColor
-                    : Colors.white54,
-                fontSize: 12,
-              ),
-            ),
-            trailing: Icon(
-              Icons.timelapse,
-              color: isSelected ? ColorConstants.primaryColor : Colors.white54,
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _showHoursPopup(String day) {
-    List<String> tempHours = List.from(_dayHoursMap[day] ?? []);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1E1E1E),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Text(
-                "$day Saatleri",
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _hoursList.map((h) {
-                    bool isSel = tempHours.contains(h);
-                    return ChoiceChip(
-                      label: Text(h),
-                      selected: isSel,
-                      selectedColor: ColorConstants.primaryColor,
-                      backgroundColor: Colors.white10,
-                      labelStyle: GoogleFonts.poppins(
-                        color: Colors.black, // Siyah Yazı
-                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      onSelected: (val) {
-                        setDialogState(() {
-                          if (val) {
-                            tempHours.add(h);
-                          } else {
-                            tempHours.remove(h);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    "İptal",
-                    style: GoogleFonts.poppins(color: Colors.white54),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      if (tempHours.isEmpty) {
-                        _dayHoursMap.remove(day);
-                      } else {
-                        _dayHoursMap[day] = tempHours;
-                      }
-                    });
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ColorConstants.primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    "Kaydet",
-                    style: GoogleFonts.poppins(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // --- ADIM 8: EĞİTMEN KARAKTERİ ---
-  Widget _buildStep6Character() {
+  // --- ADIM 7: EĞİTMEN KARAKTERİ ---
+  Widget _buildStepCharacter() {
     return _buildStepContainer(
       title: "Eğitmen Karakterin",
       subtitle: "Tarzını seç, sana en uygun öğrencilerle eşleşmeni sağlayalım.",

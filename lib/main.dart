@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart'; // Firebase Çekirdeği
+// YENİ EKLENEN İMPORT (Yerelleştirme için)
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'firebase_options.dart'; // Yapılandırma dosyası (Otomatik oluştu)
 import 'core/constants/color_constants.dart';
 import 'widgets/auth_wrapper.dart';
@@ -28,6 +30,20 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'CoachApp',
+
+      // --- YENİ EKLENEN DİL AYARLARI ---
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('tr', 'TR'), // Türkçe desteği
+        Locale('en', 'US'), // İngilizce fallback
+      ],
+      locale: const Locale('tr', 'TR'), // Uygulamayı zorunlu Türkçe başlat
+
+      // --------------------------------
       theme: ThemeData(
         primaryColor: ColorConstants.primaryColor,
         // Keep the scaffold background black for the premium dark-mode look.

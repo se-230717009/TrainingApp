@@ -19,6 +19,7 @@ import '../core/constants/color_constants.dart';
 import '../services/auth_service.dart';
 import '../widgets/scale_button.dart';
 import '../widgets/gradient_background.dart';
+import '../widgets/custom_tooltip_bubble.dart'; // YENİ: Baloncuk eklendi
 import 'login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'coach_calender_screen.dart';
@@ -39,6 +40,27 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
   final String _uid = FirebaseAuth.instance.currentUser!.uid;
 
   int _selectedIndex = 0;
+  bool _showCalendarTooltip = false; // YENİ: Baloncuk state'i
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstTimeUser();
+  }
+
+  // YENİ: Firestore'dan kullanıcının takvime ilk girişi olup olmadığına bakar
+  Future<void> _checkFirstTimeUser() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_uid)
+        .get();
+    if (doc.exists) {
+      bool isFirst = doc.data()?['isFirstTimeCalendar'] ?? true;
+      if (isFirst && mounted) {
+        setState(() => _showCalendarTooltip = true);
+      }
+    }
+  }
 
   /// Signs the coach out of Firebase Auth and Google, then navigates to
   /// [LoginScreen] while clearing the entire navigation back stack so the
@@ -80,34 +102,55 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
           showSelectedLabels: true,
           showUnselectedLabels: true,
           currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
+          onTap: (index) {
+            setState(() => _selectedIndex = index);
+            // Eğer takvime tıklandıysa baloncuğu kapat ve firestore'u güncelle
+            if (index == 1 && _showCalendarTooltip) {
+              setState(() => _showCalendarTooltip = false);
+              FirebaseFirestore.instance.collection('users').doc(_uid).set({
+                'isFirstTimeCalendar': false,
+              }, SetOptions(merge: true));
+            }
+          },
           selectedLabelStyle: GoogleFonts.poppins(
             fontSize: 10,
             fontWeight: FontWeight.bold,
           ),
           unselectedLabelStyle: GoogleFonts.poppins(fontSize: 10),
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_outlined),
               activeIcon: Icon(Icons.dashboard),
               label: "Panelim",
             ),
+            // YENİ: Takvim ikonu CustomTooltipBubble ile sarmalandı
             BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_month_outlined),
-              activeIcon: Icon(Icons.calendar_month),
+              icon: CustomTooltipBubble(
+                isVisible: _showCalendarTooltip,
+                bottomOffset: 40.0, // Bottom Navigation Bar'a uygun yükseklik
+                message: "Müsait olduğunuz saatleri buradan ayarlayın.",
+                onClose: () {
+                  setState(() => _showCalendarTooltip = false);
+                  FirebaseFirestore.instance.collection('users').doc(_uid).set({
+                    'isFirstTimeCalendar': false,
+                  }, SetOptions(merge: true));
+                },
+                child: const Icon(Icons.calendar_month_outlined),
+              ),
+              activeIcon: const Icon(Icons.calendar_month),
               label: "Takvim",
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.chat_bubble_outline),
               activeIcon: Icon(Icons.chat_bubble),
               label: "Mesajlar",
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: "Profil",
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),
               activeIcon: Icon(Icons.settings),
               label: "Ayarlar",
@@ -286,8 +329,6 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     final String? profileImageUrl = data['profileImageUrl'];
     final String bio = data['bio'] ?? 'Henüz biyografi eklenmemiş.';
     final String lessonSport = data['lessonSport'] ?? 'Belirtilmemiş';
-    final List<dynamic> days = data['availableDays'] ?? [];
-    final List<dynamic> hours = data['availableHours'] ?? [];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -378,7 +419,7 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                 const Divider(color: Colors.white10),
                 const SizedBox(height: 16),
                 Text(
-                  "Profilin",
+                  "Branşın",
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontSize: 15,
@@ -404,43 +445,22 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Icon(
-                      Icons.calendar_today_rounded,
+                      Icons.event_available_rounded,
                       color: Colors.white54,
                       size: 16,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        days.isEmpty ? "Gün belirtilmedi" : days.join(', '),
+                        "Çalışma saatleri ve günleri takviminizden otomatik yönetilir.",
                         style: GoogleFonts.poppins(
                           color: Colors.white70,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.access_time_rounded,
-                      color: Colors.white54,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        hours.isEmpty ? "Saat belirtilmedi" : hours.join(', '),
-                        style: GoogleFonts.poppins(
-                          color: Colors.white70,
-                          fontSize: 13,
+                          fontSize: 12,
                         ),
                       ),
                     ),
@@ -597,5 +617,3 @@ class _CoachHomeScreenState extends State<CoachHomeScreen> {
     );
   }
 }
-
-// _buildMenuItem removed — use the shared SettingsMenuItem widget instead.

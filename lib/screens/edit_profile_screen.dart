@@ -20,7 +20,6 @@ import 'package:file_picker/file_picker.dart';
 import '../core/constants/color_constants.dart';
 import '../core/utils/validators.dart';
 import '../widgets/custom_button.dart';
-import '../widgets/scale_button.dart';
 import '../widgets/gradient_background.dart';
 import 'welcome_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -90,25 +89,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _deliveryMode;
   String? _lessonFormat;
   String? _coachCharacter;
-  Map<String, List<String>> _dayHoursMap = {};
 
-  final List<String> _daysList = [
-    "Pazartesi",
-    "Salı",
-    "Çarşamba",
-    "Perşembe",
-    "Cuma",
-    "Cumartesi",
-    "Pazar",
-  ];
-  final List<String> _hoursList = [
-    "06:00 - 09:00",
-    "09:00 - 12:00",
-    "12:00 - 15:00",
-    "15:00 - 18:00",
-    "18:00 - 21:00",
-    "21:00 - 00:00",
-  ];
   final List<String> _characterList = [
     "Motivatör & Enerjik",
     "Disiplinli & Güç Odaklı",
@@ -245,12 +226,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _lessonFormat = data['lessonFormat'];
           _coachCharacter = data['coachCharacter'];
 
-          if (data['dayHoursMap'] != null) {
-            _dayHoursMap = (data['dayHoursMap'] as Map<String, dynamic>).map(
-              (key, value) => MapEntry(key, List<String>.from(value)),
-            );
-          }
-
           if (data['location'] != null) {
             _selectedCity = data['location']['city'];
             _selectedDistrict = data['location']['district'];
@@ -323,9 +298,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (_coachCharacter == null) {
         return _showError("Eğitmen karakterinizi seçin.");
       }
-      if (_dayHoursMap.isEmpty) {
-        return _showError("Lütfen müsaitlik durumunuzu belirleyin.");
-      }
       if (_needsLocation &&
           (_selectedCity == null ||
               _selectedDistrict == null ||
@@ -364,12 +336,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           'goal': _selectedGoal,
         });
       } else if (_userType == 'coach') {
-        List<String> finalDays = _dayHoursMap.keys.toList();
-        List<String> finalHours = _dayHoursMap.values
-            .expand((h) => h)
-            .toSet()
-            .toList();
-
         updateData.addAll({
           'bio': _bioController.text.trim(),
           'specialties': _selectedSpecialties,
@@ -380,9 +346,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           'deliveryMode': _deliveryMode,
           'lessonFormat': _lessonFormat,
           'coachCharacter': _coachCharacter,
-          'availableDays': finalDays,
-          'availableHours': finalHours,
-          'dayHoursMap': _dayHoursMap,
         });
 
         if (_needsLocation) {
@@ -427,227 +390,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         backgroundColor: Colors.redAccent,
         behavior: SnackBarBehavior.floating,
       ),
-    );
-  }
-
-  // --- ANTRENÖR: MÜSAİTLİK DÜZENLEME MODALI ---
-  void _showAvailabilityModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E1E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return FractionallySizedBox(
-              heightFactor: 0.85,
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[700],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      "Müsaitlik Durumu",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Müsait olduğunuz günleri ve saatleri belirleyin.",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white54,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: _daysList.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          String day = _daysList[index];
-                          List<String> selectedHours = _dayHoursMap[day] ?? [];
-                          bool isSelected = selectedHours.isNotEmpty;
-
-                          return ListTile(
-                            onTap: () => _showHoursPopup(day, setModalState),
-                            tileColor: isSelected
-                                ? ColorConstants.primaryColor.withOpacity(0.1)
-                                : Colors.white10,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(
-                                color: isSelected
-                                    ? ColorConstants.primaryColor.withOpacity(
-                                        0.5,
-                                      )
-                                    : Colors.transparent,
-                              ),
-                            ),
-                            title: Text(
-                              day,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              isSelected
-                                  ? selectedHours.join(', ')
-                                  : "Saat seçmek için dokunun",
-                              style: GoogleFonts.poppins(
-                                color: isSelected
-                                    ? ColorConstants.primaryColor
-                                    : Colors.white54,
-                                fontSize: 12,
-                              ),
-                            ),
-                            trailing: Icon(
-                              Icons.timelapse,
-                              color: isSelected
-                                  ? ColorConstants.primaryColor
-                                  : Colors.white54,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ColorConstants.primaryColor,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: Text(
-                          "Bitti",
-                          style: GoogleFonts.poppins(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _showHoursPopup(String day, StateSetter setModalState) {
-    List<String> tempHours = List.from(_dayHoursMap[day] ?? []);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1E1E1E),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Text(
-                "$day Saatleri",
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _hoursList.map((h) {
-                    bool isSel = tempHours.contains(h);
-                    return ChoiceChip(
-                      label: Text(h),
-                      selected: isSel,
-                      selectedColor: ColorConstants.primaryColor,
-                      backgroundColor: Colors.white10,
-                      labelStyle: GoogleFonts.poppins(
-                        color: Colors.black,
-                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      onSelected: (val) {
-                        setDialogState(() {
-                          if (val) {
-                            tempHours.add(h);
-                          } else {
-                            tempHours.remove(h);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    "İptal",
-                    style: GoogleFonts.poppins(color: Colors.white54),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    // Hem Ana Ekranı Hem de BottomSheet'i Güncelle
-                    setState(() {
-                      if (tempHours.isEmpty) {
-                        _dayHoursMap.remove(day);
-                      } else {
-                        _dayHoursMap[day] = tempHours;
-                      }
-                    });
-                    setModalState(() {});
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ColorConstants.primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    "Kaydet",
-                    style: GoogleFonts.poppins(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 
@@ -1035,57 +777,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         _characterList,
                         _coachCharacter,
                         (val) => setState(() => _coachCharacter = val),
-                      ),
-                      const SizedBox(height: 24),
-
-                      Text(
-                        "Çalışma Gün ve Saatleri",
-                        style: GoogleFonts.poppins(
-                          color: Colors.white54,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ScaleButton(
-                        onPressed: _showAvailabilityModal,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 16,
-                            horizontal: 20,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white10,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: _dayHoursMap.isEmpty
-                                  ? Colors.redAccent.withOpacity(0.5)
-                                  : Colors.white24,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                _dayHoursMap.isEmpty
-                                    ? "Müsaitlik Seçilmedi"
-                                    : "${_dayHoursMap.length} Gün Ayarlandı",
-                                style: GoogleFonts.poppins(
-                                  color: _dayHoursMap.isEmpty
-                                      ? Colors.redAccent
-                                      : Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Icon(
-                                Icons.edit_calendar_rounded,
-                                color: _dayHoursMap.isEmpty
-                                    ? Colors.redAccent
-                                    : Colors.white54,
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                       const SizedBox(height: 24),
 
