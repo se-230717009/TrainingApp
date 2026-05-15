@@ -46,8 +46,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final TextEditingController _weightController = TextEditingController();
   String? _experienceLevel;
   String? _preferredCoachGender;
-  List<String> _selectedDays = [];
-  List<String> _selectedHours = [];
+
+  // YENİ: Dinamik Gün ve Saat Haritası
+  Map<String, List<String>> _dayHoursMap = {};
 
   final List<String> _daysList = [
     "Pazartesi",
@@ -58,14 +59,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     "Cumartesi",
     "Pazar",
   ];
-  final List<String> _hoursList = [
-    "06:00 - 09:00",
-    "09:00 - 12:00",
-    "12:00 - 15:00",
-    "15:00 - 18:00",
-    "18:00 - 21:00",
-    "21:00 - 00:00",
-  ];
+
+  // YENİ: 1'er Saatlik Dilimler (07:00 - 22:00)
+  final List<String> _hourlySlots = List.generate(
+    16,
+    (i) => "${(i + 7).toString().padLeft(2, '0')}:00",
+  );
+
   final List<String> _goals = [
     "Kilo Vermek",
     "Kas Kazanmak",
@@ -153,19 +153,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_currentIndex == 6 && _experienceLevel == null)
       return _showError("Deneyim seçin.");
 
+    // Son Aşama Kontrolü
+    if (_currentIndex == 7) {
+      if (_preferredCoachGender == null)
+        return _showError("Lütfen antrenör tercihinizi seçin.");
+      if (_dayHoursMap.isEmpty)
+        return _showError("Lütfen en az bir müsait gün ve saat seçin.");
+      _finishOnboarding();
+      return;
+    }
+
     if (_currentIndex < 7) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
       );
-    } else {
-      _finishOnboarding();
     }
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+      SnackBar(
+        content: Text(message, style: GoogleFonts.poppins()),
+        backgroundColor: Colors.redAccent,
+      ),
     );
   }
 
@@ -186,8 +197,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           'weight': _weightController.text,
           'experienceLevel': _experienceLevel,
           'preferredCoachGender': _preferredCoachGender,
-          'availableDays': _selectedDays,
-          'availableHours': _selectedHours,
+          'dayHoursMap': _dayHoursMap, // YENİ: Nokta atışı gün ve saatler
           'isOnboardingCompleted': true,
         },
       );
@@ -236,6 +246,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           backgroundColor: Colors.white10,
                           color: ColorConstants.primaryColor,
                           minHeight: 6,
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
                       const SizedBox(width: 15),
@@ -389,7 +400,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               style: GoogleFonts.poppins(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Colors.black,
+                color: Colors
+                    .black, // Dark/Light mod bağımsız siyah okunurluk sağlar
               ),
             ),
             if (isSelected) const Icon(Icons.check_circle, color: Colors.black),
@@ -434,7 +446,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               selectedColor: ColorConstants.primaryColor,
               backgroundColor: Colors.white10,
               labelStyle: GoogleFonts.poppins(
-                color: Colors.black,
+                color: Colors.black, // Dark mode sorununu çözer
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
               onSelected: (selected) {
@@ -577,6 +589,93 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  // --- YENİ UX: Gün ve Saatleri Açılır Pencere ile Seçme ---
+  void _showHoursPopup(String day) {
+    List<String> tempHours = List.from(_dayHoursMap[day] ?? []);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                "$day Saatleri",
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _hourlySlots.map((h) {
+                    bool isSel = tempHours.contains(h);
+                    return ChoiceChip(
+                      label: Text(h),
+                      selected: isSel,
+                      selectedColor: ColorConstants.primaryColor,
+                      backgroundColor: Colors.white10,
+                      labelStyle: GoogleFonts.poppins(
+                        color: isSel ? Colors.black : Colors.white,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (val) {
+                        setDialogState(() {
+                          val ? tempHours.add(h) : tempHours.remove(h);
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    "İptal",
+                    style: GoogleFonts.poppins(color: Colors.white54),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      if (tempHours.isEmpty) {
+                        _dayHoursMap.remove(day);
+                      } else {
+                        _dayHoursMap[day] = tempHours;
+                        _dayHoursMap[day]!
+                            .sort(); // Saatleri küçükten büyüğe sıralar
+                      }
+                    });
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorConstants.primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    "Kaydet",
+                    style: GoogleFonts.poppins(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildStep7Preferences() {
     return _buildStepContainer(
       title: "Zaman ve Tercih",
@@ -619,62 +718,71 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              "Müsait Günlerin",
+              "Müsait Gün ve Saatlerin",
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _daysList
-                  .map(
-                    (day) => ChoiceChip(
-                      label: Text(day),
-                      selected: _selectedDays.contains(day),
-                      selectedColor: ColorConstants.primaryColor,
-                      backgroundColor: Colors.white10,
-                      labelStyle: const TextStyle(color: Colors.black),
-                      onSelected: (val) => setState(
-                        () => val
-                            ? _selectedDays.add(day)
-                            : _selectedDays.remove(day),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 4),
             Text(
-              "Müsait Saatlerin",
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+              "Günlere tıklayarak saat (1 saatlik dilimler) ekleyebilirsiniz.",
+              style: GoogleFonts.poppins(color: Colors.white54, fontSize: 12),
             ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _hoursList
-                  .map(
-                    (hour) => ChoiceChip(
-                      label: Text(hour),
-                      selected: _selectedHours.contains(hour),
-                      selectedColor: ColorConstants.primaryColor,
-                      backgroundColor: Colors.white10,
-                      labelStyle: const TextStyle(color: Colors.black),
-                      onSelected: (val) => setState(
-                        () => val
-                            ? _selectedHours.add(hour)
-                            : _selectedHours.remove(hour),
-                      ),
+            const SizedBox(height: 12),
+
+            // YENİ: Alt alta şık gün listesi
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _daysList.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                String day = _daysList[index];
+                List<String> selectedHours = _dayHoursMap[day] ?? [];
+                bool isSelected = selectedHours.isNotEmpty;
+
+                return ListTile(
+                  onTap: () => _showHoursPopup(day),
+                  tileColor: isSelected
+                      ? ColorConstants.primaryColor.withOpacity(0.1)
+                      : Colors.white10,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected
+                          ? ColorConstants.primaryColor.withOpacity(0.5)
+                          : Colors.transparent,
                     ),
-                  )
-                  .toList(),
+                  ),
+                  title: Text(
+                    day,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    isSelected
+                        ? selectedHours.join(', ')
+                        : "Saat seçmek için dokunun",
+                    style: GoogleFonts.poppins(
+                      color: isSelected
+                          ? ColorConstants.primaryColor
+                          : Colors.white54,
+                      fontSize: 12,
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.timelapse,
+                    color: isSelected
+                        ? ColorConstants.primaryColor
+                        : Colors.white54,
+                  ),
+                );
+              },
             ),
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -726,7 +834,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     subtext,
                     style: GoogleFonts.poppins(
                       fontSize: 12,
-                      color: isSelected ? Colors.black87 : Colors.white54,
+                      color: Colors.black87,
                     ),
                   ),
                 ],

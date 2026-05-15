@@ -372,9 +372,8 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                                 selectedColor: chipColor,
                                 backgroundColor: Colors.white10,
                                 labelStyle: GoogleFonts.poppins(
-                                  color: isSelected
-                                      ? Colors.black
-                                      : Colors.white,
+                                  color: Colors.black,
+
                                   fontWeight: isSelected
                                       ? FontWeight.bold
                                       : FontWeight.normal,
@@ -603,9 +602,7 @@ class _CoachCalendarScreenState extends State<CoachCalendarScreen> {
                               selectedColor: Colors.blueAccent,
                               backgroundColor: Colors.white10,
                               labelStyle: GoogleFonts.poppins(
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.white70,
+                                color: Colors.black,
                               ),
                               onSelected: (val) => setModalState(() {
                                 val

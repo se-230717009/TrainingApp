@@ -1,4 +1,4 @@
-// ignore_for_file: unused_field, deprecated_member_use, dangling_library_doc_comments
+// ignore_for_file: unused_field, deprecated_member_use, dangling_library_doc_comments, unused_import
 
 /// lib/screens/edit_profile_screen.dart
 ///
@@ -20,6 +20,7 @@ import 'package:file_picker/file_picker.dart';
 import '../core/constants/color_constants.dart';
 import '../core/utils/validators.dart';
 import '../widgets/custom_button.dart';
+import '../widgets/scale_button.dart';
 import '../widgets/gradient_background.dart';
 import 'welcome_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -34,7 +35,6 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  /// The current user's UID — nullable so guests don't crash the app.
   final ImagePicker _picker = ImagePicker();
   final String? _uid = FirebaseAuth.instance.currentUser?.uid;
   bool _isLoading = true;
@@ -56,6 +56,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   List<String> _selectedSports = [];
   String? _selectedLevel;
   String? _selectedGoal;
+
+  // YENİ EKLENDİ: Sporcu Gün/Saat Haritası
+  Map<String, List<String>> _dayHoursMap = {};
+
+  final List<String> _daysList = [
+    "Pazartesi",
+    "Salı",
+    "Çarşamba",
+    "Perşembe",
+    "Cuma",
+    "Cumartesi",
+    "Pazar",
+  ];
+  final List<String> _hourlySlots = List.generate(
+    16,
+    (i) => "${(i + 7).toString().padLeft(2, '0')}:00",
+  );
 
   final List<String> _sportsList = [
     "Fitness",
@@ -118,11 +135,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Only load data if there is a signed-in user.
     if (_uid != null) {
       _loadUserData();
     } else {
-      // No user — skip loading, leave _isLoading = false.
       _isLoading = false;
     }
   }
@@ -198,7 +213,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await _fetchCities();
       DocumentSnapshot doc = await FirebaseFirestore.instance
           .collection('users')
-          .doc(_uid!) // safe: only called when _uid != null
+          .doc(_uid!)
           .get();
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
@@ -212,12 +227,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _heightController.text = data['height']?.toString() ?? '';
           _weightController.text = data['weight']?.toString() ?? '';
           _selectedSports = List<String>.from(data['interestedSports'] ?? []);
+
           String? fetchedLevel = data['experienceLevel'];
           _selectedLevel = _levelList.contains(fetchedLevel)
               ? fetchedLevel
               : null;
+
           String? fetchedGoal = data['goal'];
           _selectedGoal = _goalList.contains(fetchedGoal) ? fetchedGoal : null;
+
+          // YENİ EKLENDİ: Sporcu saatlerini yükle
+          if (data['dayHoursMap'] != null) {
+            _dayHoursMap = (data['dayHoursMap'] as Map<String, dynamic>).map(
+              (key, value) => MapEntry(key, List<String>.from(value)),
+            );
+          }
         } else if (_userType == 'coach') {
           _bioController.text = data['bio'] ?? '';
           _priceController.text = (data['hourlyRate'] ?? '').toString();
@@ -274,7 +298,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       _showError("Fotoğraf seçilemedi: $e");
     }
-
     await _picker.pickImage(source: ImageSource.gallery, imageQuality: 25);
   }
 
@@ -287,17 +310,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       String? weightError = Validators.validateWeight(_weightController.text);
       if (weightError != null) return _showError(weightError);
     } else if (_userType == 'coach') {
-      if (_selectedSpecialties.isEmpty) {
+      if (_selectedSpecialties.isEmpty)
         return _showError("Lütfen en az bir uzmanlık alanı seçin.");
-      }
-      if (_priceController.text.trim().isEmpty) {
+      if (_priceController.text.trim().isEmpty)
         return _showError("Saatlik ücret boş olamaz.");
-      }
       if (_deliveryMode == null) return _showError("Çalışma şeklini seçin.");
       if (_lessonFormat == null) return _showError("Ders formatını seçin.");
-      if (_coachCharacter == null) {
+      if (_coachCharacter == null)
         return _showError("Eğitmen karakterinizi seçin.");
-      }
       if (_needsLocation &&
           (_selectedCity == null ||
               _selectedDistrict == null ||
@@ -334,6 +354,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           'interestedSports': _selectedSports,
           'experienceLevel': _selectedLevel,
           'goal': _selectedGoal,
+          'dayHoursMap':
+              _dayHoursMap, // YENİ EKLENDİ: Sporcu Müsaitlikleri Kaydediliyor
         });
       } else if (_userType == 'coach') {
         updateData.addAll({
@@ -393,10 +415,95 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  // --- YENİ UX: Öğrenci için Gün ve Saatleri Açılır Pencere ile Seçme ---
+  void _showHoursPopup(String day) {
+    List<String> tempHours = List.from(_dayHoursMap[day] ?? []);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                "$day Saatleri",
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _hourlySlots.map((h) {
+                    bool isSel = tempHours.contains(h);
+                    return ChoiceChip(
+                      label: Text(h),
+                      selected: isSel,
+                      selectedColor: ColorConstants.primaryColor,
+                      backgroundColor: Colors.white10,
+                      labelStyle: GoogleFonts.poppins(
+                        color: isSel ? Colors.black : Colors.white,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (val) {
+                        setDialogState(() {
+                          val ? tempHours.add(h) : tempHours.remove(h);
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    "İptal",
+                    style: GoogleFonts.poppins(color: Colors.white54),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      if (tempHours.isEmpty) {
+                        _dayHoursMap.remove(day);
+                      } else {
+                        _dayHoursMap[day] = tempHours;
+                        _dayHoursMap[day]!
+                            .sort(); // Saatleri küçükten büyüğe sıralar
+                      }
+                    });
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorConstants.primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    "Kaydet",
+                    style: GoogleFonts.poppins(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ----- Guest guard -----
-    // If no user is signed in, show a friendly prompt instead of crashing.
     if (_uid == null) {
       return GradientBackground(
         child: Scaffold(
@@ -443,7 +550,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: () => Navigator.push(
@@ -477,16 +583,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
     }
 
-    // ----- Authenticated user view -----
     return GradientBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          // Semi-transparent to match MyLessonsScreen / AthleteMessagesScreen.
           backgroundColor: Colors.black.withOpacity(0.6),
           elevation: 0,
-          // No back button — this screen is a tab inside the bottom nav bar.
           automaticallyImplyLeading: false,
           title: Text(
             "Profilim",
@@ -505,7 +608,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               )
             : SingleChildScrollView(
                 padding: EdgeInsets.only(
-                  // Push content below the transparent AppBar.
                   top: MediaQuery.of(context).padding.top + kToolbarHeight + 16,
                   left: 24,
                   right: 24,
@@ -653,6 +755,69 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           );
                         }).toList(),
                       ),
+
+                      // YENİ EKLENDİ: Sporcu Gün & Saat Seçimi
+                      const SizedBox(height: 30),
+                      Text(
+                        "Müsait Gün ve Saatlerin",
+                        style: GoogleFonts.poppins(
+                          color: Colors.white54,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _daysList.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          String day = _daysList[index];
+                          List<String> selectedHours = _dayHoursMap[day] ?? [];
+                          bool isSelected = selectedHours.isNotEmpty;
+
+                          return ListTile(
+                            onTap: () => _showHoursPopup(day),
+                            tileColor: isSelected
+                                ? ColorConstants.primaryColor.withOpacity(0.1)
+                                : Colors.white10,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                
+                                    ? ColorConstants.primaryColor.withOpacity(
+                                        0.5,
+                                      )
+                                    : Colors.transparent,
+                              ),
+                            ),
+                            title: Text(
+                              day,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              isSelected
+                                  ? selectedHours.join(', ')
+                                  : "Saat seçmek için dokunun",
+                              style: GoogleFonts.poppins(
+                                color: isSelected
+                                    ? ColorConstants.primaryColor
+                                    : Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                            trailing: Icon(
+                              Icons.timelapse,
+                              color: isSelected
+                                  ? ColorConstants.primaryColor
+                                  : Colors.white54,
+                            ),
+                          );
+                        },
+                      ),
                     ],
 
                     // ==========================================
@@ -767,7 +932,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       const SizedBox(height: 24),
 
                       _buildTextField(
-                        "Saatlik Ücret (TL)",
+                        "Ortalama Saatlik Ücret (TL)",
                         _priceController,
                         isNumber: true,
                       ),
@@ -809,8 +974,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               });
                               final cityObj = _citiesData.firstWhere(
                                 (c) => c['name'] == val,
+                                orElse: () => null,
                               );
-                              _fetchDistricts(cityObj['id']);
+                              if (cityObj != null)
+                                _fetchDistricts(cityObj['id']);
                             }
                           },
                         ),
@@ -833,8 +1000,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               });
                               final districtObj = _districtsData.firstWhere(
                                 (d) => d['name'] == val,
+                                orElse: () => null,
                               );
-                              _fetchNeighborhoods(districtObj['id']);
+                              if (districtObj != null)
+                                _fetchNeighborhoods(districtObj['id']);
                             }
                           },
                         ),
@@ -850,9 +1019,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           (val) {
                             if (val != null &&
                                 val != "Önce İlçe Seçin" &&
-                                val != "Seçenek bulunamadı") {
+                                val != "Seçenek bulunamadı")
                               setState(() => _selectedNeighborhood = val);
-                            }
                           },
                         ),
                         const SizedBox(height: 16),

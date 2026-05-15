@@ -7,9 +7,6 @@
 ///   2. Messages  — conversations with coaches ([AthleteMessagesScreen]).
 ///   3. Profile   — profile editing ([EditProfileScreen]).
 ///   4. Settings  — app settings and sign-out.
-///
-/// Guest users (not signed in) can browse coaches but see prompts to
-/// register when they try to access lessons or messages.
 // ignore_for_file: unused_field, unused_element, deprecated_member_use, prefer_final_fields
 
 import 'dart:convert';
@@ -46,23 +43,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int _selectedIndex = 0;
 
+  // --- ÖĞRENCİ VERİLERİ ---
   String _athleteName = "Misafir Sporcu";
   String _athleteGoal = "";
   List<String> _interestedSports = [];
   String _preferredGender = "Farketmez";
+  Map<String, dynamic> _athleteDayHoursMap =
+      {}; // YENİ: Öğrencinin nokta atışı müsaitlikleri
 
-  // Arama ve Temel Filtreleme
+  // --- ARAMA VE FİLTRELEME ---
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
   bool _sortByCheapest = false;
 
-  // Gelişmiş Filtre Seçenekleri
   double _maxPrice = 3000;
-  String? _filterDeliveryMode; // Online, Yüzyüze, Hibrit(İkisi de)
-  String? _filterCharacter; // Motivatör & Enerjik vb.
-  String? _filterAvailability; // Tüm Eğitmenler, Müsait Olanlar
+  String? _filterDeliveryMode;
+  String? _filterCharacter;
+  String? _filterAvailability;
 
-  // Konum Filtreleri (Sadece Yüzyüze ise)
   String? _selectedCity;
   String? _selectedDistrict;
   List<dynamic> _citiesData = [];
@@ -77,6 +75,10 @@ class _HomeScreenState extends State<HomeScreen> {
     "Sert & Hedef Odaklı (Pro)",
   ];
 
+  // --- YENİ: ARKA PLAN VERİ HARİTALARI (TÜM HOCALAR İÇİN) ---
+  final Map<String, List<Map<String, dynamic>>> _allCoachRoutines = {};
+  final Map<String, List<Map<String, dynamic>>> _allCoachActivities = {};
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadAthleteData();
     }
     _fetchCities();
+    _preloadAllCoachesCalendarData(); // YENİ: Tüm hocaların takvimini önbelleğe al
   }
 
   @override
@@ -92,6 +95,123 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // --- 1. ARKA PLAN VERİ ÇEKİMİ ---
+  // Uygulama açıldığında tüm onaylı hocaların takvimlerini çeker ve eşleştirme için hazırlar.
+  Future<void> _preloadAllCoachesCalendarData() async {
+    try {
+      // Sadece müsaitlik yaratan (Özel veya Grup) ve kapatılmamış (isUnavailable: false) rutinleri çek
+      final routinesSnap = await FirebaseFirestore.instance
+          .collection('coach_routines')
+          .where('isUnavailable', isEqualTo: false)
+          .get();
+
+      for (var doc in routinesSnap.docs) {
+        final data = doc.data();
+        String cId = data['coachId'];
+        if (!_allCoachRoutines.containsKey(cId)) _allCoachRoutines[cId] = [];
+        _allCoachRoutines[cId]!.add(data);
+      }
+
+      final activitiesSnap = await FirebaseFirestore.instance
+          .collection('coach_manual_activities')
+          .where('isUnavailable', isEqualTo: false)
+          .get();
+
+      for (var doc in activitiesSnap.docs) {
+        final data = doc.data();
+        String cId = data['coachId'];
+        if (!_allCoachActivities.containsKey(cId))
+          _allCoachActivities[cId] = [];
+        _allCoachActivities[cId]!.add(data);
+      }
+    } catch (e) {
+      debugPrint("Takvim verileri önyüklenirken hata: $e");
+    }
+  }
+
+  // --- 2. ÖĞRENCİ VERİSİNİ ÇEKME ---
+  Future<void> _loadAthleteData() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_currentUser!.uid)
+        .get();
+    if (doc.exists && mounted) {
+      final data = doc.data()!;
+      setState(() {
+        _athleteGoal = data['goal'] ?? "";
+        _athleteName = data['name'] ?? "Sporcu";
+        _interestedSports = List<String>.from(data['interestedSports'] ?? []);
+        _preferredGender = data['preferredCoachGender'] ?? "Farketmez";
+        _athleteDayHoursMap = data['dayHoursMap'] ?? {}; // YENİ EKLENDİ
+      });
+    }
+  }
+
+  // --- 3. AKILLI EŞLEŞTİRME ALGORİTMASI ---
+  int _calculateMatchScore(Map<String, dynamic> coach) {
+    if (_isGuest) return 0;
+    int score = 0;
+    String idealCoachCharacter = "";
+
+    // 1. Hedef ve Karakter Uyum Puanı
+    switch (_athleteGoal) {
+      case "Kilo Vermek":
+        idealCoachCharacter = "Motivatör & Enerjik";
+        break;
+      case "Kas Yapmak":
+        idealCoachCharacter = "Disiplinli & Güç Odaklı";
+        break;
+      case "Kondisyon":
+        idealCoachCharacter = "Dinamik & Dayanıklılık Odaklı";
+        break;
+      case "Esneklik":
+        idealCoachCharacter = "Sakin & Beden Farkındalığı";
+        break;
+      case "Yarışmaya Hazırlanmak":
+        idealCoachCharacter = "Sert & Hedef Odaklı (Pro)";
+        break;
+    }
+
+    if (coach['coachCharacter'] == idealCoachCharacter) score += 20;
+    if (_preferredGender != "Farketmez" &&
+        coach['gender'] == _preferredGender) {
+      score += 10;
+    }
+
+    // 2. YENİ: Dinamik Takvim Eşleşmesi (En Önemlisi)
+    String coachId = coach['uid'];
+    List<Map<String, dynamic>> cRoutines = _allCoachRoutines[coachId] ?? [];
+
+    if (_athleteDayHoursMap.isNotEmpty) {
+      int timeScore = 0;
+
+      // Öğrencinin seçtiği her bir günü ve saatleri kontrol et
+      _athleteDayHoursMap.forEach((athleteDay, athHoursList) {
+        List<dynamic> athHours = athHoursList as List<dynamic>;
+
+        // Hocanın o gün için rutini var mı?
+        var matchingRoutines = cRoutines.where(
+          (r) => (r['days'] as List).contains(athleteDay),
+        );
+        for (var r in matchingRoutines) {
+          if (athHours.contains(r['hour'])) {
+            timeScore += 10; // Kesişen her saat için +10 puan!
+          }
+        }
+      });
+      score += timeScore;
+    }
+
+    return score;
+  }
+
+  // Filtre: Hoca şu an takvimde müsait slot barındırıyor mu?
+  bool _isCoachAvailable(String coachUid) {
+    return (_allCoachRoutines[coachUid]?.isNotEmpty ?? false) ||
+        (_allCoachActivities[coachUid]?.isNotEmpty ?? false);
+  }
+
+  // --- API KONUM METOTLARI ---
   Future<void> _fetchCities() async {
     setState(() => _isLoadingLocation = true);
     try {
@@ -138,75 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadAthleteData() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(_currentUser!.uid)
-        .get();
-    if (doc.exists && mounted) {
-      final data = doc.data()!;
-      setState(() {
-        _athleteGoal = data['goal'] ?? "";
-        _athleteName = data['name'] ?? "Sporcu";
-        _interestedSports = List<String>.from(data['interestedSports'] ?? []);
-        _preferredGender = data['preferredCoachGender'] ?? "Farketmez";
-      });
-    }
-  }
-
-  int _calculateMatchScore(Map<String, dynamic> coach) {
-    if (_isGuest) return 0;
-    int score = 0;
-    String idealCoachCharacter = "";
-
-    switch (_athleteGoal) {
-      case "Kilo Vermek":
-        idealCoachCharacter = "Motivatör & Enerjik";
-        break;
-      case "Kas Yapmak":
-        idealCoachCharacter = "Disiplinli & Güç Odaklı";
-        break;
-      case "Kondisyon":
-        idealCoachCharacter = "Dinamik & Dayanıklılık Odaklı";
-        break;
-      case "Esneklik":
-        idealCoachCharacter = "Sakin & Beden Farkındalığı";
-        break;
-      case "Yarışmaya Hazırlanmak":
-        idealCoachCharacter = "Sert & Hedef Odaklı (Pro)";
-        break;
-    }
-
-    if (coach['coachCharacter'] == idealCoachCharacter) score += 20;
-    if (_preferredGender != "Farketmez" &&
-        coach['gender'] == _preferredGender) {
-      score += 10;
-    }
-    return score;
-  }
-
-  // Takvimde aktif, meşgul olmayan bir dersi veya rutini var mı kontrolü
-  Future<bool> _isCoachAvailable(String coachUid) async {
-    final actsSnap = await FirebaseFirestore.instance
-        .collection('coach_manual_activities')
-        .where('coachId', isEqualTo: coachUid)
-        .where('isUnavailable', isEqualTo: false)
-        .limit(1)
-        .get();
-    if (actsSnap.docs.isNotEmpty) return true;
-
-    final routinesSnap = await FirebaseFirestore.instance
-        .collection('coach_routines')
-        .where('coachId', isEqualTo: coachUid)
-        .where('isUnavailable', isEqualTo: false)
-        .limit(1)
-        .get();
-    if (routinesSnap.docs.isNotEmpty) return true;
-
-    return false;
-  }
-
-  // Gelişmiş Filtre Menüsü (BottomSheet)
+  // --- GELİŞMİŞ FİLTRELEME MODALI ---
   void _showFilterModal() {
     showModalBottomSheet(
       context: context,
@@ -278,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 16),
 
                       Text(
-                        "Maksimum Ortalama Ücret",
+                        "Maksimum Saatlik Ücret",
                         style: GoogleFonts.poppins(
                           color: Colors.white70,
                           fontSize: 13,
@@ -326,7 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               selectedColor: ColorConstants.primaryColor,
                               backgroundColor: Colors.white10,
                               labelStyle: GoogleFonts.poppins(
-                                color: isSelected ? Colors.black : Colors.white,
+                                color: Colors.black,
                               ),
                               onSelected: (val) => setModalState(
                                 () => _filterDeliveryMode = val ? mode : null,
@@ -451,7 +503,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             selectedColor: ColorConstants.primaryColor,
                             backgroundColor: Colors.white10,
                             labelStyle: GoogleFonts.poppins(
-                              color: isSelected ? Colors.black : Colors.white,
+                              color: Colors.black,
                             ),
                             onSelected: (val) => setModalState(
                               () => _filterAvailability = val ? avail : null,
@@ -785,7 +837,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  // YENİ: Filtreleme Butonu
                   ScaleButton(
                     onPressed: _showFilterModal,
                     child: Container(
@@ -857,18 +908,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     final char = coach['coachCharacter'] ?? "";
                     final price = coach['hourlyRate'] ?? 0;
 
-                    // Temel Arama
                     bool matchesSearch =
                         _searchQuery.isEmpty ||
                         name.contains(_searchQuery) ||
                         sport.contains(_searchQuery) ||
                         city.contains(_searchQuery) ||
                         dist.contains(_searchQuery);
-
-                    // Fiyat Filtresi
                     bool matchesPrice = price <= _maxPrice;
 
-                    // Şekil (Online/Yüzyüze) Filtresi
                     bool matchesMode = true;
                     if (_filterDeliveryMode != null) {
                       matchesMode =
@@ -880,7 +927,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   mode == "Hibrit(İkisi de)"));
                     }
 
-                    // Konum Filtresi (Yüzyüze ise)
                     bool matchesLocation = true;
                     if ((_filterDeliveryMode == 'Yüzyüze' ||
                         _filterDeliveryMode == 'Hibrit(İkisi de)')) {
@@ -892,7 +938,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         matchesLocation = false;
                     }
 
-                    // Karakter Filtresi
                     bool matchesChar =
                         _filterCharacter == null || char == _filterCharacter;
 
@@ -912,146 +957,119 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                   }
 
-                  return FutureBuilder<List<Map<String, dynamic>>>(
-                    future: Future.wait(
-                      filteredDocs.map((doc) async {
-                        final coach = doc.data() as Map<String, dynamic>;
-                        coach['uid'] = doc.id;
+                  // Validasyonları geçip filtreleri atlayan hocalar
+                  List<Map<String, dynamic>> validCoaches = [];
+                  for (var doc in filteredDocs) {
+                    final coach = doc.data() as Map<String, dynamic>;
+                    coach['uid'] = doc.id;
 
-                        // Müsaitlik Kontrolü Filtresi
-                        if (_filterAvailability == 'Müsait Olanlar') {
-                          bool isAvailable = await _isCoachAvailable(doc.id);
-                          if (!isAvailable) return {};
-                        }
-                        return coach;
-                      }),
-                    ),
-                    builder: (context, futureSnap) {
-                      if (!futureSnap.hasData)
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: ColorConstants.primaryColor,
-                          ),
-                        );
+                    if (_filterAvailability == 'Müsait Olanlar') {
+                      if (!_isCoachAvailable(doc.id)) continue;
+                    }
+                    validCoaches.add(coach);
+                  }
 
-                      List<Map<String, dynamic>> validCoaches = futureSnap.data!
-                          .where((c) => c.isNotEmpty)
-                          .toList();
+                  if (validCoaches.isEmpty) {
+                    return Center(
+                      child: Text(
+                        "Şu an müsait olan eğitmen bulunamadı.",
+                        style: GoogleFonts.poppins(color: Colors.white54),
+                      ),
+                    );
+                  }
 
-                      if (validCoaches.isEmpty) {
-                        return Center(
+                  List<Map<String, dynamic>> perfectMatches = [];
+                  List<Map<String, dynamic>> alternativeMatches = [];
+
+                  for (var coach in validCoaches) {
+                    if (_isGuest || _interestedSports.isEmpty) {
+                      alternativeMatches.add(coach);
+                    } else {
+                      final lessonSport = coach['lessonSport'] ?? '';
+                      if (_interestedSports.contains(lessonSport)) {
+                        perfectMatches.add(coach);
+                      } else {
+                        alternativeMatches.add(coach);
+                      }
+                    }
+                  }
+
+                  if (!_isGuest && !_sortByCheapest) {
+                    perfectMatches.sort(
+                      (a, b) => _calculateMatchScore(
+                        b,
+                      ).compareTo(_calculateMatchScore(a)),
+                    );
+                  }
+
+                  return ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    children: [
+                      if (perfectMatches.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
                           child: Text(
-                            "Şu an müsait olan eğitmen bulunamadı.",
-                            style: GoogleFonts.poppins(color: Colors.white54),
+                            "Sana En Uygun Eğitmenler",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        );
-                      }
-
-                      List<Map<String, dynamic>> perfectMatches = [];
-                      List<Map<String, dynamic>> alternativeMatches = [];
-
-                      for (var coach in validCoaches) {
-                        if (_isGuest || _interestedSports.isEmpty) {
-                          alternativeMatches.add(coach);
-                        } else {
-                          final lessonSport = coach['lessonSport'] ?? '';
-                          if (_interestedSports.contains(lessonSport)) {
-                            perfectMatches.add(coach);
-                          } else {
-                            alternativeMatches.add(coach);
-                          }
-                        }
-                      }
-
-                      if (!_isGuest && !_sortByCheapest) {
-                        perfectMatches.sort(
-                          (a, b) => _calculateMatchScore(
-                            b,
-                          ).compareTo(_calculateMatchScore(a)),
-                        );
-                      }
-
-                      return ListView(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        children: [
-                          if (perfectMatches.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-                              child: Text(
-                                "Sana En Uygun Eğitmenler",
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                        ),
+                        SizedBox(
+                          height: 250,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.only(left: 24, right: 8),
+                            itemCount: perfectMatches.length,
+                            itemBuilder: (ctx, i) => Padding(
+                              padding: const EdgeInsets.only(right: 16),
+                              child: SizedBox(
+                                width: 290,
+                                child: _buildCoachCard(
+                                  perfectMatches[i],
+                                  isHighMatch: !_isGuest,
                                 ),
                               ),
                             ),
-                            SizedBox(
-                              height:
-                                  250, // Kart boyu ufaldığı için yükseklik kısaldı
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.only(
-                                  left: 24,
-                                  right: 8,
-                                ),
-                                itemCount: perfectMatches.length,
-                                itemBuilder: (ctx, i) => Padding(
-                                  padding: const EdgeInsets.only(right: 16),
-                                  child: SizedBox(
-                                    width: 290,
-                                    child: _buildCoachCard(
-                                      perfectMatches[i],
-                                      isHighMatch: !_isGuest,
-                                    ),
-                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      if (alternativeMatches.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                          child: Text(
+                            _isGuest ? "Tüm Eğitmenler" : "Farklı Deneyimler",
+                            style: GoogleFonts.poppins(
+                              color: _isGuest ? Colors.white : Colors.white54,
+                              fontSize: _isGuest ? 18 : 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          height: 250,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.only(left: 24, right: 8),
+                            itemCount: alternativeMatches.length,
+                            itemBuilder: (ctx, i) => Padding(
+                              padding: const EdgeInsets.only(right: 16),
+                              child: SizedBox(
+                                width: 290,
+                                child: _buildCoachCard(
+                                  alternativeMatches[i],
+                                  isHighMatch: false,
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 16),
-                          ],
-                          if (alternativeMatches.isNotEmpty) ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-                              child: Text(
-                                _isGuest
-                                    ? "Tüm Eğitmenler"
-                                    : "Farklı Deneyimler",
-                                style: GoogleFonts.poppins(
-                                  color: _isGuest
-                                      ? Colors.white
-                                      : Colors.white54,
-                                  fontSize: _isGuest ? 18 : 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              height: 250,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding: const EdgeInsets.only(
-                                  left: 24,
-                                  right: 8,
-                                ),
-                                itemCount: alternativeMatches.length,
-                                itemBuilder: (ctx, i) => Padding(
-                                  padding: const EdgeInsets.only(right: 16),
-                                  child: SizedBox(
-                                    width: 290,
-                                    child: _buildCoachCard(
-                                      alternativeMatches[i],
-                                      isHighMatch: false,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                        ],
-                      );
-                    },
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ],
                   );
                 },
               ),
@@ -1198,7 +1216,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // YENİ: Temizlenmiş ve dinamik hale getirilmiş Antrenör Kartı
   Widget _buildCoachCard(
     Map<String, dynamic> coachData, {
     bool isHighMatch = false,
@@ -1212,7 +1229,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final String? profileImageUrl = coachData['profileImageUrl'];
     final int hourlyRate = coachData['hourlyRate'] ?? 0;
 
-    // Bio'yu kısalt (Maksimum 80 karakter, fazlasına ... ekler)
     String bio = coachData['bio'] ?? "Henüz biyografi eklenmemiş.";
     if (bio.length > 80) bio = "${bio.substring(0, 80)}...";
 

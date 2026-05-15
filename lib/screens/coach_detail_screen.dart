@@ -1750,9 +1750,7 @@ class _AthleteCalendarModalState extends State<_AthleteCalendarModal> {
                                           ColorConstants.primaryColor,
                                       backgroundColor: Colors.white10,
                                       labelStyle: GoogleFonts.poppins(
-                                        color: isSelected
-                                            ? Colors.black
-                                            : Colors.white,
+                                        color: Colors.black,
                                       ),
                                       onSelected: (val) {
                                         setState(() {
