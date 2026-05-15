@@ -784,7 +784,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                               side: BorderSide(
-                                
+                                color: isSelected
                                     ? ColorConstants.primaryColor.withOpacity(
                                         0.5,
                                       )
